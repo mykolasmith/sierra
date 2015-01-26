@@ -1,97 +1,89 @@
-import gevent
-from gevent.event import Event
 import numpy as np
 
+import time
+
+import gevent
+from gevent.event import Event
+
 class Animation(object):
-    def __init__(self, channel, msg, trigger):
+    def __init__(self, strip, controller, msg, trigger):
+        self.strip = strip
+        self.controller = controller
         self.msg = msg
-        self.channel = channel
         self.trigger = trigger
-        self.frame = np.array([(0,0,0)] * channel.length)
+        
+        self.inputs = controller.universe.mapping.inputs[msg.channel][msg.note]
+        self.frame = np.array([(0,0,0)] * strip.length)
         self.stop = Event()
         
         if trigger == 'oneshot':
             self.accessor = id(self)
         if trigger == 'hold':
             self.accessor = msg.note
-            
-        self.channel.active_events[trigger][self.accessor] = self
+        
+        self.strip.active_events[trigger][self.accessor] = self
         
     def expire(self):
-        if self.accessor in self.channel.active_events[self.trigger]:
-            self.channel.active_events[self.trigger].pop(self.accessor)
-        
-    def off(self):
-        self.stop.set()
+        if self.accessor in self.strip.active_events[self.trigger]:
+            self.strip.active_events[self.trigger].pop(self.accessor)
             
     def sleep(self, s):
         gevent.sleep(s)
         
     def spawn(self, f, *args, **kwargs):
         return gevent.spawn(f, *args, **kwargs)
-        
-    def joinall(self, greenlets):
-        gevent.joinall(greenlets)
     
     def worker(self, *args, **kwargs):
         raise NotImplemented
         
+    def off(self):
+        raise NotImplemented
+        
 class MotionTween(Animation):
     
-    def __init__(self, channel, msg, trigger):
+    def __init__(self, strip, controller, msg):
         # Begin an animation
-        super(MotionTween, self).__init__(channel, msg, trigger)
+        super(MotionTween, self).__init__(strip, controller, msg, 'oneshot')
         
         # Spawn + join from iterable to sequence individually
-        for i in range(channel.length):
-            self.spawn(self.worker, i, msg).join()
-            
-        # Joinall to sequence concurrently
-        #self.joinall([
-            #self.spawn(animation1, msg),
-            #self.spawn(animation2, msg),
-            #self.spawn(animation3, msg)
-        #])
+        for i in range(strip.length):
+            r,g,b = self.controller.controls_for(msg.channel, self.inputs)
+            self.spawn(self.worker, i, r, g, b).join()
+            self.sleep(1/(1.0 * self.msg.velocity))
             
         # Expire the event when you're finished
         self.expire()
     
-    def worker(self, i, msg):
+    def worker(self, i, r ,g ,b):
+        def intensity(x):
+            return (x / (self.msg.velocity / offset)) / 2.0 * x
+            
         trail = list(xrange(1,5))
         for offset in trail:
             try:
-                intensity = ((msg.velocity * 2)/((len(trail) * 1.0)/offset))
-                if msg.note == 60:
-                    self.frame[i+offset] = (intensity, 0, 0)
-                if msg.note == 62:
-                    self.frame[i+offset] = (0, intensity, 0)
-                if msg.note == 64:
-                    self.frame[i+offset] = (0, 0, intensity)
+                self.frame[i+offset] = map(intensity, (r,g,b))
             except IndexError:
                 pass
         self.frame[i] = (0,0,0)
-        self.sleep(1/(1.0 * msg.velocity))
             
 class Fade(Animation):
     
-    def __init__(self, channel, msg, trigger):
-        super(Fade, self).__init__(channel, msg, trigger)
-        self.brightness = 0
-        self.steps = [x for x in range(100) if  x % 6 == 0 ]
-        for i in self.steps:
-            if not self.stop.isSet():
-                self.spawn(self.worker, i).join()
+    def __init__(self, strip, controller, msg):
+        super(Fade, self).__init__(strip, controller, msg, 'hold')
+        self.steps = [x for x in range(127) if x % round((msg.velocity + 20) / 20) == 0 ]
+        self.spawn(self.worker, self.steps).join()
     
     def off(self):
-        super(Fade, self).off()
-        for i in reversed(self.steps):
-            for led in range(self.channel.length):
-                self.frame[led] = (0,0,i)
-            self.sleep(1/1000.)
-        self.sleep(0.)
-    
-    def worker(self, i):
-        self.brightness = i #Saving brightness "state"
-        for led in range(self.channel.length):
+        self.stop.set()
+        self.set_pixels(0)
+        
+    def set_pixels(self, i):
+        for led in range(self.strip.length):
             self.frame[led] = (0, 0, i)
-        self.sleep(1/1000.)
+        self.sleep(1/100.)
+    
+    def worker(self, steps):
+        for i in steps:
+            if not self.stop.isSet():
+                self.set_pixels(i)
+                
