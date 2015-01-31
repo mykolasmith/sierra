@@ -1,5 +1,6 @@
 import gevent
 import mido
+import time
 
 class MidiController(object):
     
@@ -8,6 +9,10 @@ class MidiController(object):
         print 'Connecting to MIDI port: %s' % bus
         self.bus = mido.open_input(bus)
         self.controls = dict()
+    
+    def bind(self, mapping):
+        self.mapping = mapping
+        self.mapping.controller = self
         
     def controls_for(self, channel, inputs):
         return [ self.get_control(channel, control) for control in inputs ]
@@ -27,17 +32,19 @@ class MidiController(object):
     def listener(self, universe):
         self.universe = universe
         while True:
+            t0 = time.time()
             gevent.joinall([
                 gevent.spawn(self.dispatch, msg)
                 for msg in self.bus.iter_pending()
             ])
-            gevent.sleep(0.)
+            delta = time.time() - t0
+            gevent.sleep(delta)
             
     def dispatch(self, msg):
         msg.channel += 1
         if msg.type == 'note_on':
-            gevent.spawn(self.universe.mapping.fire, msg).join()
+            gevent.spawn(self.mapping.fire, msg).join()
         if msg.type == 'note_off':
-            gevent.spawn(self.universe.mapping.expire, msg).join()
+            gevent.spawn(self.mapping.expire, msg).join()
         if msg.type == 'control_change':
             gevent.spawn(self.update_control, msg).join()

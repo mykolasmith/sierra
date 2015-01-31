@@ -12,7 +12,7 @@ class Animation(object):
         self.msg = msg
         self.trigger = trigger
         
-        self.inputs = controller.universe.mapping.inputs[msg.channel][msg.note]
+        self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.frame = np.array([(0,0,0)] * strip.length)
         self.stop = Event()
         
@@ -38,6 +38,31 @@ class Animation(object):
         
     def off(self):
         raise NotImplemented
+        
+class FullKeyboardPositional(Animation):
+    
+    def __init__(self, strip, controller, msg):
+        super(FullKeyboardPositional, self).__init__(strip, controller, msg, 'hold')
+        self.length = strip.length
+        
+        self.min = 36
+        self.max = 59
+        self.keys = self.max - self.min
+        self.width = round(self.length / self.keys)
+        
+        self.from_pos = (self.msg.note - self.min) * self.width
+        self.to_pos = self.from_pos + self.width
+        r,g,b = self.controller.controls_for(msg.channel, self.inputs)
+        self.spawn(self.worker, r, g, b).join()
+    
+    def worker(self, r, g, b):
+        for i in xrange(int(self.from_pos), int(self.to_pos)):
+            self.frame[i] = (r, g, b)
+            
+    def off(self):
+        self.stop.set()
+        for i in xrange(int(self.from_pos), int(self.to_pos)):
+            self.frame[i] = (0, 0, 0)
         
 class MotionTween(Animation):
     
@@ -80,10 +105,10 @@ class Fade(Animation):
     def set_pixels(self, i):
         for led in range(self.strip.length):
             self.frame[led] = (0, 0, i)
-        self.sleep(1/100.)
     
     def worker(self, steps):
         for i in steps:
             if not self.stop.isSet():
                 self.set_pixels(i)
+                self.sleep(1/100.)
                 

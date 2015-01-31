@@ -1,5 +1,6 @@
 import numpy as np
 import gevent
+import time
 
 class Strip(object):
     
@@ -9,9 +10,9 @@ class Strip(object):
         self.frame = np.array([(0,0,0)] * length)
         self.active_events = { 'oneshot' : {}, 'hold' : {} }
 
-    def aggregator(self, universe):
-        self.universe = universe
+    def aggregator(self):
         while True:
+            t0 = time.time()
             oneshots = [ anim.frame for anim in
                 self.active_events['oneshot'].itervalues() ]
             holds = [ anim.frame for anim in
@@ -20,4 +21,5 @@ class Strip(object):
             if oneshots or holds:
                 self.frame = np.maximum.reduce(oneshots + holds)
             
-            gevent.sleep(1/240.)
+            delta = time.time() - t0
+            gevent.sleep(delta)

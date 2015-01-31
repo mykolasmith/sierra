@@ -1,7 +1,8 @@
 import mido
 import logging
 
-log = logging.getLogger("/Users/M/sierra/midi.log")
+logging.basicConfig(level=logging.INFO)
+log = logging.getLogger("midi.log")
 
 if __name__ == '__main__':
     bus = mido.open_input("IAC Driver Bus 1")
