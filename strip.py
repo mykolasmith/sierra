@@ -13,6 +13,7 @@ class Strip(object):
     def aggregator(self):
         while True:
             t0 = time.time()
+            
             oneshots = [ anim.frame for anim in
                 self.active_events['oneshot'].itervalues() ]
             holds = [ anim.frame for anim in

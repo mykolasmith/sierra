@@ -7,7 +7,7 @@ from controller import MidiController
 from mapping import MidiMapping
 from strip import Strip
 
-from animations import MotionTween, Fade, FullKeyboardPositional
+from animations import MotionTween, Fade, Positional
         
 class Universe(object):
     
@@ -75,11 +75,10 @@ if __name__ == '__main__':
         2: Strip(300)
     }
     
-    group_1 = [strips.get(1), strips.get(2)]
+    group1 = [strips.get(1), strips.get(2)]
     
     mpk49 = MidiController("IAC Driver Bus 1")
-    mapping = MidiMapping()
-    mpk49.bind(mapping)
+    mapping = MidiMapping(mpk49)
     
     mapping.add(strips=[strips.get(1)],
                 channel=1,
@@ -91,22 +90,18 @@ if __name__ == '__main__':
                 notes=[62],
                 animation=MotionTween,
                 inputs=[12,13,14])
-    mapping.add(strips=group_1,
+    mapping.add(strips=group1,
                 channel=1,
                 notes=[64],
                 animation=Fade)
-    mapping.add(strips=group_1,
+    mapping.add(strips=group1,
                 channel=1,
                 notes=xrange(36,59),
-                animation=FullKeyboardPositional,
+                animation=Positional,
                 inputs=[15,16,17])
     
     controllers = {
         'mpk49' : mpk49
-    }
-    
-    mappings = {
-        'mpk49' : mapping
     }
     
     universe = Universe(client, strips, controllers)

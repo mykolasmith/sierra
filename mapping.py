@@ -2,11 +2,14 @@ import gevent
 
 class MidiMapping(object):
     
-    def __init__(self):
+    def __init__(self, controller):
         print 'Created mapping...'
         self.map = dict()
+        self.controller = controller
+        self.controller.mapping = self
         
     def add(self, strips=None, channel=None, notes=None, animation=None, inputs=[]):
+            
         if not channel in self.map:
             self.map.update({ channel: dict() })
         
@@ -35,13 +38,16 @@ class MidiMapping(object):
                 })
             
     def expire(self, msg):
-        release = []
+        parent = []
+        off = []
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:
                 if msg.note in strip.active_events['hold']:
                     animation = strip.active_events['hold'][msg.note]
-                    release.append(gevent.spawn(animation.off))
-        gevent.joinall(release)
+                    parent.append(gevent.spawn(animation.kill_parent_greenlet))
+                    off.append(gevent.spawn(animation.off))
+        gevent.joinall(parent)
+        gevent.joinall(off)
         
     def animation_for(self, channel, note):
         if note in self.map[channel]:
