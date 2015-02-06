@@ -18,50 +18,74 @@ class Universe(object):
         self.controllers = controllers
         
         self.tasks = Queue()
-        self.pending = []
+        self.expire = Queue()
+        
+        self.pending_tasks = []
+        self.pending_expiry = []
         
         gevent.joinall([
             gevent.spawn(self.start),
-            gevent.spawn(self.scheduler),
-            gevent.spawn(self.handler),
+            gevent.spawn(self.firing_scheduler),
+            gevent.spawn(self.firing_handler),
+            gevent.spawn(self.expiry_scheduler),
+            gevent.spawn(self.expiry_handler),
             gevent.spawn(self.writer)
         ])
         
     def start(self):
         gevent.joinall(
             [ gevent.spawn(controller.listener, self) for controller in self.controllers.itervalues()] +
-            [ gevent.spawn(strip.aggregator) for strip in self.strips.itervalues() ]
+            [ gevent.spawn(strip.aggregator) for strip in self.strips.itervalues()]
         )
         
-    def scheduler(self): 
+    def firing_scheduler(self): 
         while True:
             t0 = time.time()
             while not self.tasks.empty():
-                task = self.tasks.get(timeout=0)
+                task = self.tasks.get()
                 event = gevent.spawn(
                     task['animation'],
                     task['strip'],
                     task['controller'],
                     task['msg']
                 )
-                self.pending.append(event)
-            delta = time.time() - t0
-            gevent.sleep(delta)
+                self.pending_tasks.append(event)
+            gevent.sleep(time.time() - t0)
     
-    def handler(self):
+    def firing_handler(self):
         while True:
             t0 = time.time()
-            if self.pending:
-                gevent.joinall(self.pending)
-                self.pending = []
-            delta = time.time() - t0
-            gevent.sleep(delta)
+            if self.pending_tasks:
+                gevent.joinall(self.pending_tasks)
+                self.pending_tasks = []
+            gevent.sleep(time.time() - t0)
+            
+    def expiry_scheduler(self):
+        while True:
+            t0 = time.time()
+            while not self.expire.empty():
+                expiry = self.expire.get()
+                gevent.kill(expiry.parent)
+                expire = gevent.spawn(expiry.off)
+                self.pending_expiry.append(expire)
+            gevent.sleep(time.time() - t0)
+            
+    def expiry_handler(self):
+        while True:
+            t0 = time.time()
+            if self.pending_expiry:
+                gevent.joinall(self.pending_expiry)
+                self.pending_expiry = []
+            gevent.sleep(time.time() - t0)
         
     def writer(self):
         while True:
-            for channel, strip in strips.iteritems():
-                self.client.put_pixels(strip.frame, channel)
-            gevent.sleep(1/240.)
+            for channel, strip in self.strips.iteritems():
+                try:
+                    self.client.put_pixels(strip.frame, channel)
+                except:
+                    pass
+            gevent.sleep(1/90.)
             
 if __name__ == '__main__':
     connected = False
@@ -80,17 +104,28 @@ if __name__ == '__main__':
     mpk49 = MidiController("IAC Driver Bus 1")
     mapping = MidiMapping(mpk49)
     
+    F1 = 12
+    F2 = 13
+    F3 = 14
+    F4 = 15
+    F5 = 16
+    F6 = 17
+    
     mapping.add(strips=[strips.get(1)],
                 channel=1,
-                notes=[60],
                 animation=MotionTween,
-                inputs=[12,13,14])
+                notes=[60],
+                inputs=[F1,F2,F3],
+                master=True,
+                pitchwheel=True)
     mapping.add(strips=[strips.get(2)],
                 channel=1,
-                notes=[62],
                 animation=MotionTween,
-                inputs=[12,13,14])
-    mapping.add(strips=group1,
+                notes=[62],
+                inputs=[F1,F2,F3],
+                master=True,
+                pitchwheel=True)
+    mapping.add(strips=[strips.get(1)],
                 channel=1,
                 notes=[64],
                 animation=Fade)
@@ -98,7 +133,7 @@ if __name__ == '__main__':
                 channel=1,
                 notes=xrange(36,59),
                 animation=Positional,
-                inputs=[15,16,17])
+                inputs=[F4,F5,F6])
     
     controllers = {
         'mpk49' : mpk49

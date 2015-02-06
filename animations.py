@@ -12,60 +12,58 @@ class Animation(object):
         self.msg = msg
         self.trigger = trigger
         
+        self.parent = gevent.getcurrent()
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.frame = np.array([(0,0,0)] * strip.length)
         
-        self.parent = gevent.getcurrent()
-        self.stop = Event()
-        
         if trigger == 'oneshot':
+            self.events = self.strip.oneshots
             self.accessor = id(self)
         if trigger == 'hold':
+            self.events = self.strip.holds
             self.accessor = msg.note
         
-        self.strip.active_events[trigger][self.accessor] = self
+        self.events[self.accessor] = self
+        
+    def get_frame(self):
+        if self.controller.master:
+            master = self.controller.master_for(self.msg.channel) * (1/127.0)
+            return self.frame * master
+        else:
+            return self.frame
         
     def expire(self):
-        if self.accessor in self.strip.active_events[self.trigger]:
-            self.strip.active_events[self.trigger].pop(self.accessor)
+        if self.accessor in self.events:
+            self.events.pop(self.accessor)
+            
+    def spawn(self, f, *args, **kwargs):
+        return gevent.spawn(f, *args, **kwargs)
             
     def sleep(self, s):
         gevent.sleep(s)
         
-    def spawn(self, f, *args, **kwargs):
-        return gevent.spawn(f, *args, **kwargs)
-    
-    def worker(self, *args, **kwargs):
-        raise NotImplemented
-        
-    def kill_parent_greenlet(self):
-        gevent.kill(self.parent)
-        
-    def decrement(self, led, decay):
-        last = tuple(self.frame[led])
-        while any(self.frame[led]):
-            self.frame[led] = tuple( v - decay if v - decay > 0 else v for v in self.frame[led] )
-            if tuple(self.frame[led]) == last:
-                self.frame[led] = (0, 0, 0)
-            else:
-                last = tuple(self.frame[led])
-            gevent.sleep(0.)
-        
+    def decrement(self, decay):
+        while self.frame.any():
+            self.frame = (self.frame - decay).clip(0)
+            gevent.sleep(1/70.)
+
 class Positional(Animation):
     
     def __init__(self, strip, controller, msg):
         super(Positional, self).__init__(strip, controller, msg, 'hold')
-        self.length = strip.length
         
         self.min = 36
         self.max = 59
+        #TODO fix this
+        
         self.keys = self.max - self.min
-        self.width = round(self.length / self.keys)
+        self.width = round(self.strip.length / self.keys)
         
         self.from_pos = (self.msg.note - self.min) * self.width
         self.to_pos = self.from_pos + self.width
         self.active = xrange(int(self.from_pos), int(self.to_pos))
         r,g,b = self.controller.controls_for(msg.channel, self.inputs)
+        
         self.spawn(self.worker, r, g, b).join()
     
     def worker(self, r, g, b):
@@ -73,20 +71,25 @@ class Positional(Animation):
             self.frame[i] = (r, g, b)
             
     def off(self):
-        pts = []
-        for i in self.active:
-            pts.append(self.spawn(self.decrement, i, 10))
-        gevent.joinall(pts)
+        self.spawn(self.decrement, 10).join()
         
 class MotionTween(Animation):
     
     def __init__(self, strip, controller, msg):
         # Begin an animation
         super(MotionTween, self).__init__(strip, controller, msg, 'oneshot')
+        self.steps = xrange(0, strip.length) 
+        self.trail = xrange(0,5) #TODO Is it faster to make it self.trail and call from within the worker, or pass it in?
+
+        if controller.pitchwheel:
+            self.pitch = controller.pitchwheel_for(msg.channel)
+            
+            if self.pitch != 0:
+                self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
         
-        # Spawn + join from iterable to sequence frame workers individually
-        for i in range(strip.length):
-            r,g,b = self.controller.controls_for(msg.channel, self.inputs)
+        r,g,b = self.controller.controls_for(msg.channel, self.inputs)
+
+        for i in self.steps:
             self.spawn(self.worker, i, r, g, b).join()
             self.sleep(1/(1.0 * self.msg.velocity))
             
@@ -94,16 +97,17 @@ class MotionTween(Animation):
         self.expire()
     
     def worker(self, i, r ,g ,b):
-        def intensity(x):
-            return (x / (self.msg.velocity / offset)) / 2.0 * x
+        
+        def intensity(v):
+            return (2 * v) * (127 / 127.0) * (1 - (float(offset) / len(self.trail)))
             
-        trail = list(xrange(1,5))
-        for offset in trail:
-            try:
-                self.frame[i+offset] = map(intensity, (r,g,b))
-            except IndexError:
-                pass
-        self.frame[i] = (0,0,0)
+        for offset in reversed(self.trail):
+            if self.pitch >= 0 and i - offset > 0:
+                self.frame[i - offset] =  map(intensity, (r,g,b))
+                self.frame[i - len(self.trail)] = (0,0,0)
+            if self.pitch < 0 and -i + offset < 0:
+                self.frame[offset - i] = map(intensity, (r,g,b))
+                self.frame[-i + len(self.trail)] = (0,0,0)
             
 class Fade(Animation):
     

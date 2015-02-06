@@ -8,7 +8,7 @@ class MidiMapping(object):
         self.controller = controller
         self.controller.mapping = self
         
-    def add(self, strips=None, channel=None, notes=None, animation=None, inputs=[]):
+    def add(self, strips=None, channel=None,  animation=None, notes=[], inputs=[], master=False, pitchwheel=False):
             
         if not channel in self.map:
             self.map.update({ channel: dict() })
@@ -23,36 +23,34 @@ class MidiMapping(object):
         for control in inputs:
             self.controller.add_control(channel, control)
             
+        if master:
+            self.controller.use_master(channel)
+            
+        if pitchwheel:
+            self.controller.use_pitchwheel(channel)
+            
     def remove(self, channel, note):
         self.map[channel].update({ note: dict() })
 
     def fire(self, msg):
         animation = self.animation_for(msg.channel, msg.note)
         if msg.note in self.map[msg.channel]:
-            for strip in self.map[msg.channel][msg.note]['strips']:
+            for strip in self.map[msg.channel][msg.note]['strips']:  
                 self.controller.universe.tasks.put({
                     'animation' : animation,
                     'strip'     : strip,
-                    'controller': self.controller,
                     'msg'       : msg,
+                    'controller': self.controller
                 })
             
     def expire(self, msg):
-        parent = []
-        off = []
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:
-                if msg.note in strip.active_events['hold']:
-                    animation = strip.active_events['hold'][msg.note]
-                    parent.append(gevent.spawn(animation.kill_parent_greenlet))
-                    off.append(gevent.spawn(animation.off))
-        gevent.joinall(parent)
-        gevent.joinall(off)
-        
+                animation = strip.holds[msg.note]
+                self.controller.universe.expire.put(animation)
+
     def animation_for(self, channel, note):
-        if note in self.map[channel]:
-            return self.map[channel][note]['animation']
+        return self.map[channel][note]['animation']
             
     def inputs_for(self, channel, note):
-        if note in self.map[channel]:
-            return self.map[channel][note]['inputs']
+        return self.map[channel][note]['inputs']

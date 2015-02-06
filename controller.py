@@ -7,23 +7,43 @@ class MidiController(object):
     def __init__(self, bus):
         # MPK, APC, etc.
         print 'Connecting to MIDI port: %s' % bus
-        self.bus = mido.open_input(bus)
+        self.master = False
+        self.pitchwheel = False
         self.controls = dict()
+        self.bus = mido.open_input(bus)
         
     def controls_for(self, channel, inputs):
         return [ self.get_control(channel, control) for control in inputs ]
+    
+    def pitchwheel_for(self, channel):
+        return self.controls[channel]['pitchwheel']
+    
+    def master_for(self, channel):
+        return self.controls[channel][1]
         
     def add_control(self, channel, control):
         if not channel in self.controls:
             self.controls[channel] = dict()
         self.controls[channel].update({ control : 0 })
         
+    def use_master(self, channel):
+        self.master = True
+        if not 1 in self.controls[channel]:
+            self.controls[channel].update({ 1 : 127 })
+        
+    def use_pitchwheel(self, channel):
+        self.pitchwheel = True
+        if not 'pitchwheel' in self.controls[channel]:
+            self.controls[channel].update({ 'pitchwheel' : 0 })
+        
     def update_control(self, msg):
-        self.controls[msg.channel][msg.control] = msg.value
+        self.controls[msg.channel].update({ msg.control : msg.value })
+        
+    def update_pitchwheel(self, msg):
+        self.controls[msg.channel].update({ 'pitchwheel' : msg.pitch })
         
     def get_control(self, channel, control):
-        if channel in self.controls:
-            return self.controls[channel][control]
+        return self.controls[channel][control]
         
     def listener(self, universe):
         self.universe = universe
@@ -34,8 +54,7 @@ class MidiController(object):
                     gevent.spawn(self.dispatch, msg)
                     for msg in self.bus.iter_pending()
                 ])
-            delta = time.time() - t0
-            gevent.sleep(delta)
+            gevent.sleep(time.time() - t0)
             
     def dispatch(self, msg):
         msg.channel += 1 # Channel indexes from 0, but Ableton indexes from 1
@@ -45,3 +64,5 @@ class MidiController(object):
             gevent.spawn(self.mapping.expire, msg).join()
         if msg.type == 'control_change':
             gevent.spawn(self.update_control, msg).join()
+        if msg.type == 'pitchwheel':
+            gevent.spawn(self.update_pitchwheel, msg).join()
