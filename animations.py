@@ -1,6 +1,7 @@
 import numpy as np
 
 import time
+import colorsys
 
 import gevent
 from gevent.event import Event
@@ -12,7 +13,7 @@ class Animation(object):
         self.msg = msg
         self.trigger = trigger
         
-        self.parent = gevent.getcurrent()
+        self.greenlets = [ gevent.getcurrent() ]
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.frame = np.array([(0,0,0)] * strip.length)
         
@@ -24,6 +25,10 @@ class Animation(object):
             self.accessor = msg.note
         
         self.events[self.accessor] = self
+        self.refresh_params()
+        
+    def hsv_to_rgb(self, h, s, v, max=127):
+        return tuple(i * 255 for i in colorsys.hsv_to_rgb(1.0/max * h, 1.0/max * s, 1.0/max * v))
         
     def get_frame(self):
         if self.controller.master:
@@ -31,22 +36,43 @@ class Animation(object):
             return self.frame * master
         else:
             return self.frame
+            
+    def refresh_params(self):
+        self.params = self.controller.controls_for(self.msg.channel, self.inputs)
         
     def expire(self):
         if self.accessor in self.events:
             self.events.pop(self.accessor)
             
     def spawn(self, f, *args, **kwargs):
-        return gevent.spawn(f, *args, **kwargs)
+        g = gevent.spawn(f, *args, **kwargs)
+        self.greenlets.append(g)
+        return g
             
     def sleep(self, s):
         gevent.sleep(s)
         
     def decrement(self, decay):
         while self.frame.any():
-            self.frame = (self.frame - decay).clip(0)
-            gevent.sleep(1/70.)
-
+            self.frame = (self.frame - 5).clip(0)
+            gevent.sleep(1. / decay)
+            
+    def increment(self, target, state, attack):
+        while not np.array_equal(self.frame[target], state):
+            for k,v in enumerate(self.frame[target]):
+                if v < state[k]:
+                    self.frame[target][k] += 5
+                else:
+                    self.frame[target][k] = state
+            gevent.sleep(1. / attack)
+            
+class Clear(Animation):
+    
+    def __init__(self,strip,controller,msg):
+        super(Clear, self).__init__(strip, controller, msg, 'oneshot')
+        self.strip.oneshots = {}
+        self.strip.holds = {}
+        
 class Positional(Animation):
     
     def __init__(self, strip, controller, msg):
@@ -54,73 +80,94 @@ class Positional(Animation):
         
         self.min = 36
         self.max = 59
-        #TODO fix this
         
-        self.keys = self.max - self.min
-        self.width = round(self.strip.length / self.keys)
+        self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * strip.length)
+        self.h, self.v, self.toggle = self.params
+        self.spawn(self.worker).join()
         
-        self.from_pos = (self.msg.note - self.min) * self.width
-        self.to_pos = self.from_pos + self.width
-        self.active = xrange(int(self.from_pos), int(self.to_pos))
-        r,g,b = self.controller.controls_for(msg.channel, self.inputs)
-        
-        self.spawn(self.worker, r, g, b).join()
-    
-    def worker(self, r, g, b):
-        for i in self.active:
-            self.frame[i] = (r, g, b)
+    def worker(self):
+        while True:
+            t0 = time.time()
+            pitch = self.controller.pitchwheel_for(self.msg.channel)
+            
+            factor =  round((5/120.) * self.strip.length)
+            
+            if self.toggle:
+                width = abs(round((pitch / 8192.) * factor))
+                if pitch > 0:
+                    leds = xrange(self.pos, self.pos+int(width))
+                if pitch < 0:
+                    leds = xrange(self.pos-int(width), self.pos+1)
+                if pitch == 0:
+                    leds = [self.pos]
+            else:
+                width = factor
+                leds = xrange(self.pos, self.pos+int(width))
+                
+            rgb = self.hsv_to_rgb(self.h,127,self.v)
+            for i in leds:
+                self.frame[i] = rgb
+                
+            self.sleep(time.time()- t0)
+            
+            for i in xrange(0, self.strip.length):
+                self.frame[i] = (0,0,0)
             
     def off(self):
-        self.spawn(self.decrement, 10).join()
+        self.decrement(100)
         
 class MotionTween(Animation):
     
     def __init__(self, strip, controller, msg):
         # Begin an animation
         super(MotionTween, self).__init__(strip, controller, msg, 'oneshot')
-        self.steps = xrange(0, strip.length) 
-        self.trail = xrange(0,5) #TODO Is it faster to make it self.trail and call from within the worker, or pass it in?
+        self.trail = xrange(0,5) 
 
         if controller.pitchwheel:
             self.pitch = controller.pitchwheel_for(msg.channel)
             
             if self.pitch != 0:
                 self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
-        
-        r,g,b = self.controller.controls_for(msg.channel, self.inputs)
-
-        for i in self.steps:
-            self.spawn(self.worker, i, r, g, b).join()
+            
+        for i in xrange(0, strip.length + len(self.trail)):
+            if self.params[2]:
+                self.refresh_params()
+            self.spawn(self.worker,i,self.params[0],127,self.params[1]).join()
             self.sleep(1/(1.0 * self.msg.velocity))
             
         # Always expire a oneshot when it's finished
         self.expire()
     
-    def worker(self, i, r ,g ,b):
+    def worker(self,i,h,s,v):
         
-        def intensity(v):
-            return (2 * v) * (127 / 127.0) * (1 - (float(offset) / len(self.trail)))
+        def intensity(x):
+            return x * (1 - (float(offset) / len(self.trail)))
             
         for offset in reversed(self.trail):
-            if self.pitch >= 0 and i - offset > 0:
-                self.frame[i - offset] =  map(intensity, (r,g,b))
-                self.frame[i - len(self.trail)] = (0,0,0)
-            if self.pitch < 0 and -i + offset < 0:
-                self.frame[offset - i] = map(intensity, (r,g,b))
-                self.frame[-i + len(self.trail)] = (0,0,0)
+            try:
+                if self.pitch >= 0 and i - offset > 0:
+                    self.frame[i - offset] =  map(intensity, self.hsv_to_rgb(h,s,v))
+                    self.frame[i - len(self.trail)] = (0,0,0)
+                if self.pitch < 0 and -i + offset < 0:
+                    self.frame[offset - i] = map(intensity, self.hsv_to_rgb(h,s,v))
+                    self.frame[-i + len(self.trail)] = (0,0,0)
+            except:
+                pass
             
 class Fade(Animation):
     
+    # TODO: This is a big fat work in progress
+    
     def __init__(self, strip, controller, msg):
         super(Fade, self).__init__(strip, controller, msg, 'hold')
-        self.steps = [x for x in range(127) if x % round((msg.velocity + 20) / 20) == 0 ]
-        for i in self.steps:
-            for led in range(self.strip.length):
-                self.frame[led] = (0, 0, i)
-            self.sleep(1/100.)
+        self.h, self.v = self.controller.controls_for(msg.channel, self.inputs)
+        self.spawn(self.worker).join()
+        
+    def worker(self):
+        rgb = self.hsv_to_rgb(self.h, 127, self.v)
+        for led in range(self.strip.length):
+            self.frame[led] = rgb
     
     def off(self):
-        for i in reversed(self.steps):
-            for led in range(self.strip.length):
-                self.frame[led] = (0,0,i)
-            self.sleep(1/100.)
+        self.spawn(self.decrement, 2.0).join()
+        self.expire()

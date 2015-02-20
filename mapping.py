@@ -46,8 +46,9 @@ class MidiMapping(object):
     def expire(self, msg):
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:
-                animation = strip.holds[msg.note]
-                self.controller.universe.expire.put(animation)
+                if msg.note in strip.holds:
+                    animation = strip.holds[msg.note]
+                    self.controller.universe.expire.put(animation)
 
     def animation_for(self, channel, note):
         return self.map[channel][note]['animation']
