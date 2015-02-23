@@ -36,10 +36,10 @@ class MidiMapping(object):
         animation = self.animation_for(msg.channel, msg.note)
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:  
-                self.controller.universe.tasks.put({
-                    'animation' : animation,
-                    'strip'     : strip,
+                strip.tasks.put({ # Find a way to attach the mapping to the universe
+                    'animation' : animation, # Should we put the animation directly onto an event loop on the strip?
                     'msg'       : msg,
+                    'strip'     : strip,
                     'controller': self.controller
                 })
             
@@ -47,8 +47,7 @@ class MidiMapping(object):
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:
                 if msg.note in strip.holds:
-                    animation = strip.holds[msg.note]
-                    self.controller.universe.expire.put(animation)
+                    strip.expire.put(msg)
 
     def animation_for(self, channel, note):
         return self.map[channel][note]['animation']

@@ -45,11 +45,10 @@ class MidiController(object):
     def get_control(self, channel, control):
         return self.controls[channel][control]
         
-    def listener(self, universe):
-        self.universe = universe
+    def listener(self):
         while True:
             t0 = time.time()
-            if self.bus.pending():
+            if self.bus.pending(): # Try commenting out?
                 gevent.joinall([
                     gevent.spawn(self.dispatch, msg)
                     for msg in self.bus.iter_pending()
@@ -57,7 +56,7 @@ class MidiController(object):
             gevent.sleep(time.time() - t0)
             
     def dispatch(self, msg):
-        msg.channel += 1 # Channel indexes from 0, but Ableton indexes from 1
+        msg.channel += 1 # Ableton indexes from 1
         if msg.type == 'note_on':
             gevent.spawn(self.mapping.fire, msg).join()
         if msg.type == 'note_off':

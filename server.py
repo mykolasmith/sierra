@@ -1,5 +1,7 @@
 import time
 import opc
+import numpy as np
+
 import gevent
 from gevent.queue import Queue
 
@@ -19,65 +21,35 @@ class Universe(object):
         
         self.tasks = Queue()
         self.expire = Queue()
+        self.greenlets = []
         
-        self.pending_tasks = []
-        self.pending_expiry = []
+        start = []
         
-        gevent.joinall([
-            gevent.spawn(self.start),
-            gevent.spawn(self.firing_scheduler),
-            gevent.spawn(self.firing_handler),
-            gevent.spawn(self.expiry_scheduler),
-            gevent.spawn(self.expiry_handler),
-            gevent.spawn(self.writer)
-        ])
+        for controller in self.controllers.itervalues():
+            start.append(gevent.spawn(controller.listener))
+            
+        for strip in self.strips:
+            start.append(gevent.spawn(strip.aggregator))
+            start.append(gevent.spawn(strip.worker))
+            start.append(gevent.spawn(strip.firing))
+            start.append(gevent.spawn(strip.expiry))
+            #greenlets.append(gevent.spawn(strip.print_events))
+            
+        start.append(gevent.spawn(self.writer))
         
-    def start(self):
-        gevent.joinall(
-            [ gevent.spawn(controller.listener, self) for controller in self.controllers.itervalues()] +
-            [ gevent.spawn(strip.aggregator) for strip in self.strips.itervalues()]
-        )
-        
-    def firing_scheduler(self): 
-        while True:
-            t0 = time.time()
-            while not self.tasks.empty():
-                task = self.tasks.get()
-                event = gevent.spawn(
-                    task['animation'],
-                    task['strip'],
-                    task['controller'],
-                    task['msg']
-                )
-                self.pending_tasks.append(event)
-            gevent.sleep(time.time() - t0)
+        gevent.joinall(start)
     
-    def firing_handler(self):
-        while True:
-            t0 = time.time()
-            gevent.joinall(self.pending_tasks)
-            gevent.sleep(time.time() - t0)
-            
-    def expiry_scheduler(self):
-        while True:
-            t0 = time.time()
-            while not self.expire.empty():
-                expiry = self.expire.get()
-                gevent.killall(expiry.greenlets)
-                expire = gevent.spawn(expiry.off)
-                self.pending_expiry.append(expire)
-            gevent.sleep(time.time() - t0)
-            
-    def expiry_handler(self):
-        while True:
-            t0 = time.time()
-            gevent.joinall(self.pending_expiry)
-            gevent.sleep(time.time() - t0)
-        
     def writer(self):
+        MAX = 300
         while True:
-            for channel, strip in self.strips.iteritems():
-                self.client.put_pixels(strip.frame, channel)
+            frames = [
+                strip.frame[:MAX]
+                if len(strip.frame) >= MAX
+                else np.concatenate(
+                    [strip.frame, np.zeros((MAX - strip.length,3)) ]
+                )
+                for strip in self.strips ]
+            self.client.put_pixels(np.concatenate(frames), channel=0)
             gevent.sleep(1/80.)
             
 if __name__ == '__main__':
@@ -87,14 +59,21 @@ if __name__ == '__main__':
     if client.can_connect():
         print 'Connected to Beaglebone...'
     
-    strips = {
-        1: Strip(120),
-        2: Strip(300)
-    }
+    strips = [
+        Strip(120),
+        Strip(300),
+        Strip(300),
+        #Strip(300),
+        #Strip(300),
+        #Strip(300),
+        #Strip(300),
+        #Strip(300),
+    ]
     
-    LEFT =  [strips.get(1)]
-    RIGHT = [strips.get(2)]
-    BOTH = LEFT + RIGHT
+    ALL =    strips
+    FIRST =  strips[0]
+    SECOND = strips[1]
+    THIRD =  strips[2]
     
     mpk49 = MidiController("IAC Driver Bus 1")
     mapping = MidiMapping(mpk49)
@@ -128,50 +107,65 @@ if __name__ == '__main__':
     
     # MotionTween
     
-    mapping.add(strips=LEFT,
+    mapping.add(strips=ALL,
                 channel=1,
                 animation=MotionTween,
                 notes=[60],
                 inputs=[K1,F1,S1],
                 master=True,
                 pitchwheel=True)
-    mapping.add(strips=BOTH,
+    mapping.add(strips=[FIRST],
                 channel=1,
                 animation=MotionTween,
                 notes=[62],
                 inputs=[K2,F2,S2],
                 master=True,
                 pitchwheel=True)
-    mapping.add(strips=RIGHT,
+    mapping.add(strips=[THIRD],
                 channel=1,
                 notes=[64],
                 animation=MotionTween,
                 inputs=[K3,F3,S3],
                 master=True,
                 pitchwheel=True)
+    mapping.add(strips=[SECOND],
+                channel=1,
+                notes=[65],
+                animation=MotionTween,
+                inputs=[K4,F4,S4],
+                master=True,
+                pitchwheel=True)
+                
+    #mapping.add(strips=strips[3:8],
+    #            channel=1,
+    #            notes=[67],
+    #            animation=MotionTween,
+    #            inputs=[K6,F6,S6],
+    #            master=True,
+    #            pitchwheel=True)
                 
     # Positional
 
-    mapping.add(strips=BOTH,
+    mapping.add(strips=ALL,
                 channel=1,
                 notes=xrange(36,59),
                 animation=Positional,
-                inputs=[K4,F4,S4],
+                inputs=[K5,F5,S5],
                 master=True)
     
     # Clear
                 
-    mapping.add(strips=LEFT,
+    mapping.add(strips=FIRST,
                 channel=1,
                 notes=[79],
                 animation=Clear)
                 
-    mapping.add(strips=BOTH,
+    mapping.add(strips=ALL,
                 channel=1,
                 notes=[81],
                 animation=Clear)
         
-    mapping.add(strips=RIGHT,
+    mapping.add(strips=THIRD,
                 channel=1,
                 notes=[83],
                 animation=Clear)

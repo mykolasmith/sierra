@@ -19,12 +19,14 @@ class Animation(object):
         
         if trigger == 'oneshot':
             self.events = self.strip.oneshots
-            self.accessor = id(self)
+            self.events.append(self)
+            self.remove = lambda: self.events.remove(self)
         if trigger == 'hold':
             self.events = self.strip.holds
             self.accessor = msg.note
+            self.events[self.accessor] = self
+            self.remove = lambda: self.events.pop(self.accessor)
         
-        self.events[self.accessor] = self
         self.refresh_params()
         
     def hsv_to_rgb(self, h, s, v, max=127):
@@ -41,8 +43,8 @@ class Animation(object):
         self.params = self.controller.controls_for(self.msg.channel, self.inputs)
         
     def expire(self):
-        if self.accessor in self.events:
-            self.events.pop(self.accessor)
+        self.remove()
+        gevent.killall(self.greenlets)
             
     def spawn(self, f, *args, **kwargs):
         g = gevent.spawn(f, *args, **kwargs)
@@ -70,7 +72,7 @@ class Clear(Animation):
     
     def __init__(self,strip,controller,msg):
         super(Clear, self).__init__(strip, controller, msg, 'oneshot')
-        self.strip.oneshots = {}
+        self.strip.oneshots = []
         self.strip.holds = {}
         
 class Positional(Animation):
@@ -108,7 +110,7 @@ class Positional(Animation):
             for i in leds:
                 self.frame[i] = rgb
                 
-            self.sleep(time.time()- t0)
+            self.sleep(time.time()- t0) # Try commenting this out?
             
             for i in xrange(0, self.strip.length):
                 self.frame[i] = (0,0,0)
@@ -119,7 +121,6 @@ class Positional(Animation):
 class MotionTween(Animation):
     
     def __init__(self, strip, controller, msg):
-        # Begin an animation
         super(MotionTween, self).__init__(strip, controller, msg, 'oneshot')
         self.trail = xrange(0,5) 
 
@@ -134,8 +135,7 @@ class MotionTween(Animation):
                 self.refresh_params()
             self.spawn(self.worker,i,self.params[0],127,self.params[1]).join()
             self.sleep(1/(1.0 * self.msg.velocity))
-            
-        # Always expire a oneshot when it's finished
+        
         self.expire()
     
     def worker(self,i,h,s,v):
@@ -169,5 +169,5 @@ class Fade(Animation):
             self.frame[led] = rgb
     
     def off(self):
-        self.spawn(self.decrement, 2.0).join()
+        self.spawn(self.decrement, 1.0).join()
         self.expire()
