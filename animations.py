@@ -117,27 +117,38 @@ class Positional(Animation):
             
     def off(self):
         self.decrement(100)
+        self.expire()
         
 class MotionTween(Animation):
     
     def __init__(self, strip, controller, msg):
         super(MotionTween, self).__init__(strip, controller, msg, 'oneshot')
-        self.trail = xrange(0,5) 
+        self.trail = xrange(0,5)
 
         if controller.pitchwheel:
             self.pitch = controller.pitchwheel_for(msg.channel)
             
             if self.pitch != 0:
                 self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
-            
-        for i in xrange(0, strip.length + len(self.trail)):
-            if self.params[2]:
-                self.refresh_params()
-            self.spawn(self.worker,i,self.params[0],127,self.params[1]).join()
-            self.sleep(1/(1.0 * self.msg.velocity))
         
+        num_frames = self.strip.length + len(self.trail)
+        self.animator(num_frames)
         self.expire()
-    
+        
+    def animator(self, num_frames):
+        start = time.time()
+        counter = 0
+        elapsed = 0
+        while num_frames - counter >= 0:
+            t0 = time.time()
+            if elapsed > 0.01 * counter:
+                if self.params[2] == 127:
+                    self.refresh_params()
+                self.worker(counter,self.params[0],127,self.params[1])
+                counter += 1
+            elapsed = time.time() - start
+            gevent.sleep(0)
+            
     def worker(self,i,h,s,v):
         
         def intensity(x):

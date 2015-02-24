@@ -19,10 +19,6 @@ class Universe(object):
         self.strips = strips
         self.controllers = controllers
         
-        self.tasks = Queue()
-        self.expire = Queue()
-        self.greenlets = []
-        
         start = []
         
         for controller in self.controllers.itervalues():
@@ -33,7 +29,7 @@ class Universe(object):
             start.append(gevent.spawn(strip.worker))
             start.append(gevent.spawn(strip.firing))
             start.append(gevent.spawn(strip.expiry))
-            #greenlets.append(gevent.spawn(strip.print_events))
+            #start.append(gevent.spawn(strip.print_events))
             
         start.append(gevent.spawn(self.writer))
         
@@ -63,11 +59,11 @@ if __name__ == '__main__':
         Strip(120),
         Strip(300),
         Strip(300),
-        #Strip(300),
-        #Strip(300),
-        #Strip(300),
-        #Strip(300),
-        #Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
     ]
     
     ALL =    strips
