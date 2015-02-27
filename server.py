@@ -42,10 +42,10 @@ class Universe(object):
                 strip.frame[:MAX]
                 if len(strip.frame) >= MAX
                 else np.concatenate(
-                    [strip.frame, np.zeros((MAX - strip.length,3)) ]
+                    [ strip.frame, np.zeros((MAX - strip.length, 3)) ]
                 )
                 for strip in self.strips ]
-            self.client.put_pixels(np.concatenate(frames), channel=0)
+            self.client.put_pixels(np.concatenate(frames))
             gevent.sleep(1/80.)
             
 if __name__ == '__main__':
@@ -141,8 +141,15 @@ if __name__ == '__main__':
     #            pitchwheel=True)
                 
     # Positional
+    
+    mapping.add(strips=[FIRST],
+                channel=1,
+                notes=[72],
+                animation=Fade,
+                inputs=[K6,F6],
+                master=True)
 
-    mapping.add(strips=ALL,
+    mapping.add(strips=[FIRST],
                 channel=1,
                 notes=xrange(36,59),
                 animation=Positional,

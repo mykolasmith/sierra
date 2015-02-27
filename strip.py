@@ -11,7 +11,7 @@ class Strip(object):
         self.frame = np.array([(0,0,0)] * length)
         self.length = length
         self.holds = {}
-        self.oneshots = []
+        self.oneshots = {}
         
         self.tasks = Queue()
         self.expire = Queue()
@@ -24,7 +24,7 @@ class Strip(object):
             
             if self.holds or self.oneshots:
                 self.frame = np.maximum.reduce(
-                    [ anim.get_frame() for anim in self.oneshots ] +
+                    [ anim.get_frame() for anim in self.oneshots.itervalues() ] +
                     [ anim.get_frame() for anim in self.holds.itervalues() ]
                 )
             
@@ -36,21 +36,22 @@ class Strip(object):
             if self.greenlets:
                 gevent.joinall(self.greenlets)
                 self.greenlets = []
-            gevent.sleep(time.time() - t0)
+            gevent.sleep(0)
             
     def firing(self):
         while True:
             t0 = time.time()
             while not self.tasks.empty():
                 task = self.tasks.get()
-                event = gevent.spawn(
-                    task['animation'],
-                    task['strip'],
-                    task['controller'],
-                    task['msg']
-                )
-                self.greenlets.append(event)
-            gevent.sleep(time.time() - t0)
+                if task['msg'].note not in self.holds:
+                    event = gevent.spawn(
+                        task['animation'],
+                        task['strip'],
+                        task['controller'],
+                        task['msg']
+                    )
+                    self.greenlets.append(event)
+            gevent.sleep(0)
 
     def expiry(self):
         while True:
@@ -58,10 +59,11 @@ class Strip(object):
             while not self.expire.empty():
                 expiry = self.expire.get()
                 anim = self.holds.get(expiry.note)
-                gevent.killall(anim.greenlets)
-                expire = gevent.spawn(anim.off)
-                self.greenlets.append(expire)
-            gevent.sleep(time.time() - t0)
+                if anim:
+                    gevent.killall(anim.greenlets)
+                    expire = gevent.spawn(anim.off)
+                    self.greenlets.append(expire)
+            gevent.sleep(0)
             
     def print_events(self):
         while True:

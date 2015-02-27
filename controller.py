@@ -53,7 +53,7 @@ class MidiController(object):
                     gevent.spawn(self.dispatch, msg)
                     for msg in self.bus.iter_pending()
                 ])
-            gevent.sleep(time.time() - t0)
+            gevent.sleep(0)
             
     def dispatch(self, msg):
         msg.channel += 1 # Ableton indexes from 1
