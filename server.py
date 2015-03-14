@@ -5,12 +5,13 @@ import numpy as np
 import gevent
 from gevent.queue import Queue
 
-from controller import MidiController
+from controller import MidiController, MixerController
 from mapping import MidiMapping
 from strip import Strip
+from consts import *
 
-from animations import MotionTween, Fade, Positional, Clear
-        
+from animations import MotionTween, Positional, Clear
+
 class Universe(object):
     
     def __init__(self, client, strips, controllers):
@@ -19,23 +20,38 @@ class Universe(object):
         self.strips = strips
         self.controllers = controllers
         
+        # This is the main event loop. A list of coroutines to cycle between.
         start = []
         
+        # Start the listeners for each MIDI controller (controller.py)
         for controller in self.controllers.itervalues():
             start.append(gevent.spawn(controller.listener))
             
+        
         for strip in self.strips:
+            # Aggegator combines animation frames into 1 strip frame
             start.append(gevent.spawn(strip.aggregator))
+            # The worker delegates note_on/note_off actions to the event loop
             start.append(gevent.spawn(strip.worker))
+            # Firing prepares new task for note_on 
             start.append(gevent.spawn(strip.firing))
+            # Expiry ends an active event
             start.append(gevent.spawn(strip.expiry))
-            #start.append(gevent.spawn(strip.print_events))
             
+        # The writer sends all frames to the network layer
         start.append(gevent.spawn(self.writer))
         
+        # Starts the main event loop
         gevent.joinall(start)
     
     def writer(self):
+        # OK, this is the slight caveat:
+        #   Since LEDscape is optimized to receive a single frame
+        #   consisting of the entire frame buffer,
+        #   that is a consistent length (e.g. 8 strips, 300 leds each),
+        #   we need to fill some blank indices,
+        #   when a srip is shorter than the max.
+        # There might be a better way to do this with numpy. TODO
         MAX = 300
         while True:
             frames = [
@@ -47,16 +63,18 @@ class Universe(object):
                 for strip in self.strips ]
             self.client.put_pixels(np.concatenate(frames))
             gevent.sleep(1/80.)
-            
+
 if __name__ == '__main__':
-    connected = False
+    # Open connection to the OPC client.
     client = opc.Client("beaglebone.local:7890")
-    
     if client.can_connect():
         print 'Connected to Beaglebone...'
     
+    # Declare length of each strip.
+    # There is absolutely no geometry support yet. TODO
+    # Index refers to the beaglebone channel (0-48).
     strips = [
-        Strip(120),
+        Strip(300),
         Strip(300),
         Strip(300),
         Strip(300),
@@ -65,116 +83,59 @@ if __name__ == '__main__':
         Strip(300),
         Strip(300),
     ]
-    
-    ALL =    strips
-    FIRST =  strips[0]
-    SECOND = strips[1]
-    THIRD =  strips[2]
-    
+    # Create a MIDI controller and declare which MIDI port to listen on.
     mpk49 = MidiController("IAC Driver Bus 1")
+    
+    # Add a note->animation mapping for the controller.
     mapping = MidiMapping(mpk49)
     
-    # MPK Mappings
+    # This part is a bit tedious.
+    # Thinking about doing a spatially aware mapping GUI using my Project Tango. TODO
     
-    F1 = 12
-    F2 = 13
-    F3 = 14
-    F4 = 15
-    F5 = 16
-    F6 = 17
-    
-    K1 = 2
-    K2 = 3
-    K3 = 4
-    K4 = 5
-    K5 = 6
-    K6 = 7
-    K7 = 8
-    K8 = 9
-    
-    S1 = 21
-    S2 = 22
-    S3 = 23
-    S4 = 24
-    S5 = 25
-    S6 = 26
-    S7 = 27
-    S8 = 28
-    
-    # MotionTween
-    
-    mapping.add(strips=ALL,
+    # When channel 1, note 60 is pressed
+    # Run a MotionTween animation class
+    # Across all the strips
+    # Using a variety of the MPK49's inputs
+    # With respect to the master brightness
+    # And the pitchweel's position
+    mapping.add(notes=[60],
                 channel=1,
                 animation=MotionTween,
-                notes=[60],
-                inputs=[K1,F1,S1],
-                master=True,
-                pitchwheel=True)
-    mapping.add(strips=[FIRST],
-                channel=1,
-                animation=MotionTween,
-                notes=[62],
-                inputs=[K2,F2,S2],
-                master=True,
-                pitchwheel=True)
-    mapping.add(strips=[THIRD],
-                channel=1,
-                notes=[64],
-                animation=MotionTween,
-                inputs=[K3,F3,S3],
-                master=True,
-                pitchwheel=True)
-    mapping.add(strips=[SECOND],
-                channel=1,
-                notes=[65],
-                animation=MotionTween,
-                inputs=[K4,F4,S4],
+                strips=strips,
+                inputs=[F1,K1,S1,S6,F8],
                 master=True,
                 pitchwheel=True)
                 
-    #mapping.add(strips=strips[3:8],
-    #            channel=1,
-    #            notes=[67],
-    #            animation=MotionTween,
-    #            inputs=[K6,F6,S6],
-    #            master=True,
-    #            pitchwheel=True)
-                
-    # Positional
-    
-    mapping.add(strips=[FIRST],
+    # When any note between 36 and 59 on channel 1 is pressed
+    # Run a Positional animation class
+    # This is how I do something like playing a chord
+    # To have the corresponding indices light up
+    mapping.add(notes=xrange(36,59),
                 channel=1,
-                notes=[72],
-                animation=Fade,
-                inputs=[K6,F6],
-                master=True)
-
-    mapping.add(strips=[FIRST],
-                channel=1,
-                notes=xrange(36,59),
                 animation=Positional,
-                inputs=[K5,F5,S5],
+                strips=strips,
+                inputs=[F4,K4,S8],
                 master=True)
-    
-    # Clear
                 
-    mapping.add(strips=FIRST,
+    # I like having one note that I can hit
+    # That clears everything
+    mapping.add(notes=[84],
                 channel=1,
-                notes=[79],
-                animation=Clear)
+                animation=Clear,
+                strips=strips)
                 
-    mapping.add(strips=ALL,
-                channel=1,
-                notes=[81],
-                animation=Clear)
-        
-    mapping.add(strips=THIRD,
-                channel=1,
-                notes=[83],
-                animation=Clear)
+    # OK, this is ghetto.
+    # But I wanted a way use parameters from a DJM-900,
+    # So I'm passing those values into the MPK49's "globals".
+    # Since I don't really have animations working w/ multiple MIDI controllers yet. TODO
+    # nexus = MixerController("DJM-900nexus", mpk49)
     
+    # With the current setup, you can use any device as long as it's broadcasting over the IAC driver.
+    # But if you include the nexus, it will throw an error unless a DJM-900 nexus is hooked up.
+    # Kind of annoying. TODO
     controllers = {
-        'mpk49' : mpk49
+        'mpk49' : mpk49,
+    #    'nexus' : nexus
     }
     
     universe = Universe(client, strips, controllers)

@@ -31,7 +31,7 @@ class MidiMapping(object):
             
     def remove(self, channel, note):
         self.map[channel].update({ note: dict() })
-
+    
     def fire(self, msg):
         animation = self.animation_for(msg.channel, msg.note)
         if msg.note in self.map[msg.channel]:
@@ -42,7 +42,7 @@ class MidiMapping(object):
                     'strip'     : strip,
                     'controller': self.controller
                 })
-            
+    
     def expire(self, msg):
         if msg.note in self.map[msg.channel]:
             for strip in self.map[msg.channel][msg.note]['strips']:

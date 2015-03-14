@@ -2,15 +2,39 @@ import gevent
 import mido
 import time
 
+class MixerController(object):
+    def __init__(self, bus, midi_controller):
+        # Nexus 900
+        print 'Connecting to MIDI port: %s' % bus
+        self.bus = mido.open_input(bus)
+        self.midi_controller = midi_controller
+        
+    def listener(self):
+        while True:
+            if self.bus.pending(): # Try commenting out?
+                gevent.joinall([
+                    gevent.spawn(self.update_global, msg)
+                    for msg in self.bus.iter_pending()
+                    if  msg.type == 'control_change'
+                ])
+            gevent.sleep(0)
+            
+    def update_global(self, msg):
+        if msg.control in [5,10,22,83]:
+            self.midi_controller.globals.update({ 'color' : msg.value+1 })
+
 class MidiController(object):
     
     def __init__(self, bus):
         # MPK, APC, etc.
         print 'Connecting to MIDI port: %s' % bus
+        self.bus = mido.open_input(bus)
+        
+        self.controls = dict()
+        self.globals = dict()
+        
         self.master = False
         self.pitchwheel = False
-        self.controls = dict()
-        self.bus = mido.open_input(bus)
         
     def controls_for(self, channel, inputs):
         return [ self.get_control(channel, control) for control in inputs ]
