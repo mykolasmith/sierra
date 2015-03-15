@@ -32,7 +32,7 @@ class Animation(object):
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.refresh_params()
         
-    def hsv_to_rgb(self, h, s, v, max=127):
+    def hsb_to_rgb(self, h, s, v, max=127):
         # Scale hsv by max, e.g. MIDI 1-127 knob, conver to RGB, and return as numpy array
         return np.array(colorsys.hsv_to_rgb(1.0/max * h, 1.0/max * s, 1.0/max * v)) * 255
         
@@ -101,8 +101,8 @@ class Positional(Animation):
                 saturation = color * 2
         else:
             saturation = 127
-        value = self.params[1]
-        rgb = self.hsv_to_rgb(hue, saturation, value)
+        brightness = self.params[1]
+        rgb = self.hsb_to_rgb(hue, saturation, brightness)
         self.frame[self.pos:self.pos+int(self.factor)] = rgb
             
     def off(self):
@@ -120,18 +120,21 @@ class MotionTween(Animation):
             self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
         
         num_frames = self.strip.length + len(self.trail)
-        self.animator(num_frames, self.params[4])
+        alt1 = self.params[2]
+        speed = self.params[3]
+        alt2 = self.params[4]
+        self.animator(num_frames, speed, alt1, alt2)
         
-    def animator(self, num_frames, speed):
+    def animator(self, num_frames, speed, alt1, alt2):
         start = time.time()
         counter = 0
         elapsed = 0
         while num_frames - counter >= 0:
             if elapsed > 0.01 * (speed/127. * 1.5) * counter:
-                if self.params[2]:
+                if alt1:
                     self.refresh_params()
                 hue = self.params[0]
-                if self.params[3]:
+                if alt2:
                     color = self.controller.globals.get('color', 64)
                     if color > 64:
                         saturation = (127 - color) * 2
@@ -139,8 +142,8 @@ class MotionTween(Animation):
                         saturation = color * 2
                 else:
                     saturation = 127
-                value = self.params[1]
-                rgb = self.hsv_to_rgb(hue,saturation,value)
+                brightness = self.params[1]
+                rgb = self.hsb_to_rgb(hue,saturation,brightness)
                 self.worker(self.frame,counter,rgb,self.pitch,self.trail)
                 counter += 1
             elapsed = time.time() - start

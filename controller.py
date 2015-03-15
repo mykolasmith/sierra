@@ -3,6 +3,7 @@ import mido
 import time
 
 class MixerController(object):
+    
     def __init__(self, bus, midi_controller):
         # Nexus 900
         print 'Connecting to MIDI port: %s' % bus

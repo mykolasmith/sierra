@@ -74,7 +74,7 @@ if __name__ == '__main__':
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
     strips = [
-        Strip(300),
+        Strip(120),
         Strip(300),
         Strip(300),
         Strip(300),
@@ -102,7 +102,7 @@ if __name__ == '__main__':
                 channel=1,
                 animation=MotionTween,
                 strips=strips,
-                inputs=[F1,K1,S1,S6,F8],
+                inputs=[F1,K1,S1,F8,S6],
                 master=True,
                 pitchwheel=True)
                 
@@ -114,7 +114,7 @@ if __name__ == '__main__':
                 channel=1,
                 animation=Positional,
                 strips=strips,
-                inputs=[F4,K4,S8],
+                inputs=[F2,K2,S6],
                 master=True)
                 
     # I like having one note that I can hit
@@ -130,9 +130,6 @@ if __name__ == '__main__':
     # Since I don't really have animations working w/ multiple MIDI controllers yet. TODO
     # nexus = MixerController("DJM-900nexus", mpk49)
     
-    # With the current setup, you can use any device as long as it's broadcasting over the IAC driver.
-    # But if you include the nexus, it will throw an error unless a DJM-900 nexus is hooked up.
-    # Kind of annoying. TODO
     controllers = {
         'mpk49' : mpk49,
     #    'nexus' : nexus
