@@ -1,4 +1,3 @@
-import gevent
 import mido
 import time
 
@@ -16,7 +15,7 @@ class MixerController(object):
                 gevent.joinall([
                     gevent.spawn(self.update_global, msg)
                     for msg in self.bus.iter_pending()
-                    if  msg.type == 'control_change'
+                    if msg.type == 'control_change'
                 ])
             gevent.sleep(0)
             
@@ -70,23 +69,17 @@ class MidiController(object):
     def get_control(self, channel, control):
         return self.controls[channel][control]
         
-    def listener(self):
-        while True:
-            t0 = time.time()
-            if self.bus.pending(): # Try commenting out?
-                gevent.joinall([
-                    gevent.spawn(self.dispatch, msg)
-                    for msg in self.bus.iter_pending()
-                ])
-            gevent.sleep(0)
+    def listen(self):
+        for msg in self.bus.iter_pending():
+            self.dispatch(msg)
             
     def dispatch(self, msg):
         msg.channel += 1 # Ableton indexes from 1
         if msg.type == 'note_on':
-            gevent.spawn(self.mapping.fire, msg).join()
+            self.mapping.note_on(msg)
         if msg.type == 'note_off':
-            gevent.spawn(self.mapping.expire, msg).join()
+            self.mapping.note_off(msg)
         if msg.type == 'control_change':
-            gevent.spawn(self.update_control, msg).join()
+            self.update_control(msg)
         if msg.type == 'pitchwheel':
-            gevent.spawn(self.update_pitchwheel, msg).join()
+            self.update_pitchwheel(msg)

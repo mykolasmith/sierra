@@ -4,7 +4,6 @@ import time
 import colorsys
 
 import gevent
-from gevent.event import Event
 
 class Animation(object):
     
@@ -14,20 +13,11 @@ class Animation(object):
         self.msg = msg
         self.trigger = trigger
         
+        self.running = False
+        self.done = False
+        self.t0 = None
+        
         self.frame = np.array([(0,0,0)] * strip.length)
-        
-        # Different types of triggers have different behavior with respect to strip's active events
-        if trigger == 'oneshot':
-            # For oneshots, each animation is unique and show be removed after the whole thing has completed
-            self.events = self.strip.oneshots
-            self.accessor = id(self)
-        if trigger == 'hold':
-            # For holds, the note_on/note_off message determines whether the animation is active or not
-            self.events = self.strip.holds
-            self.accessor = msg.note
-        
-        # Start an animation by adding it to the strip's active events
-        self.events[self.accessor] = self
         
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.refresh_params()
@@ -48,17 +38,6 @@ class Animation(object):
         # Get current params from controller
         self.params = self.controller.controls_for(self.msg.channel, self.inputs)
         
-    def clear(self):
-        # Clear the strip
-        self.frame = np.zeros_like(self.frame)
-        
-    def expire(self):
-        # The animation is done. Clear the strip and remove this animation from the strip's active events.
-        self.clear()
-        if self.accessor in self.events:
-            self.events.pop(self.accessor)
-        self.done = True
-        
     def fade_down(self, decay=0.01):
         # Drop the brightness of each led by 5 at a given rate of decay
         # This should probably go somewhere else...
@@ -70,16 +49,6 @@ class Animation(object):
                 self.frame = (self.frame - 5).clip(0)
                 counter += 1
             elapsed = time.time() - start
-            gevent.sleep(0)
-        self.expire()
-        
-class Clear(Animation):
-    
-    def __init__(self,strip,controller,msg):
-        super(Clear, self).__init__(strip, controller, msg, 'oneshot')
-        self.clear()
-        strip.oneshots = {}
-        strip.holds = {}
         
 class Positional(Animation):
     
@@ -92,7 +61,9 @@ class Positional(Animation):
         self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * strip.length)
         self.factor = round((5/120.) * self.strip.length)
 
-        hue = self.params[0]
+    def run(self, deltaMs, pixels):
+        #hue = self.params[0]
+        hue = 64
         if self.params[2]:
             color = self.controller.globals.get('color', 64)
             if color > 64:
@@ -101,13 +72,12 @@ class Positional(Animation):
                 saturation = color * 2
         else:
             saturation = 127
-        brightness = self.params[1]
+        #brightness = self.params[1]
+        brightness = 127
         rgb = self.hsb_to_rgb(hue, saturation, brightness)
-        self.frame[self.pos:self.pos+int(self.factor)] = rgb
-            
-    def off(self):
-        self.fade_down()
-        self.expire()
+        pixels[self.pos:self.pos+int(self.factor)] = rgb
+        
+        return pixels
         
 class MotionTween(Animation):
     
@@ -119,46 +89,47 @@ class MotionTween(Animation):
         if self.pitch != 0:
             self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
         
-        num_frames = self.strip.length + len(self.trail)
-        alt1 = self.params[2]
-        speed = self.params[3]
-        alt2 = self.params[4]
-        self.animator(num_frames, speed, alt1, alt2)
+        self.num_frames = self.strip.length + len(self.trail)
+        self.refresh_enabled = self.params[2]
+        self.djm_enabled = self.params[4]
+        #speed = self.params[3]
+        self.duration = 2.0
         
-    def animator(self, num_frames, speed, alt1, alt2):
-        start = time.time()
-        counter = 0
-        elapsed = 0
-        while num_frames - counter >= 0:
-            if elapsed > 0.01 * (speed/127. * 1.5) * counter:
-                if alt1:
-                    self.refresh_params()
-                hue = self.params[0]
-                if alt2:
-                    color = self.controller.globals.get('color', 64)
-                    if color > 64:
-                        saturation = (127 - color) * 2
-                    else:
-                        saturation = color * 2
-                else:
-                    saturation = 127
-                brightness = self.params[1]
-                rgb = self.hsb_to_rgb(hue,saturation,brightness)
-                self.worker(self.frame,counter,rgb,self.pitch,self.trail)
-                counter += 1
-            elapsed = time.time() - start
-            gevent.sleep(0)
-        self.expire()
-    
-    def worker(self,frame,i,rgb,pitch,trail):
-        for offset in reversed(trail):
-            factor = (1 - (float(offset) / len(trail)))
+    def run(self, deltaMs, pixels):
+        frame = int(self.num_frames * (deltaMs / self.duration))
+        if frame > self.num_frames:
+            self.done = True
+            return np.zeros_like(pixels)
+            
+        if self.refresh_enabled:
+            self.refresh_params()
+            
+        #hue = self.params[0]
+        hue = 64
+        
+        if self.djm_enabled:
+            color = self.controller.globals.get('color', 64)
+            if color > 64:
+                saturation = (127 - color) * 2
+            else:
+                saturation = color * 2
+        else:
+            saturation = 127
+            
+        #brightness = self.params[1]
+        brightness = 127
+        
+        rgb = self.hsb_to_rgb(hue,saturation,brightness)
+        for offset in reversed(self.trail):
+            factor = (1 - (float(offset) / len(self.trail)))
             try:
-                if pitch >= 0 and i - offset > 0:
-                    frame[i-offset] = rgb * factor
-                    frame[i - len(trail)] = [0,0,0]
-                if pitch < 0 and offset - i < 0:
-                    frame[offset-i] = rgb * factor
-                    frame[-i + len(trail)] = [0,0,0]
+                if self.pitch >= 0 and frame - offset > 0:
+                    pixels[frame-offset] = rgb * factor
+                    pixels[frame - len(self.trail)] = [0,0,0]
+                if self.pitch < 0 and offset - i < 0:
+                    pixels[offset-frame] = rgb * factor
+                    pixels[-frame + len(self.trail)] = [0,0,0]
             except:
                 pass
+    
+        return pixels

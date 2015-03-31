@@ -1,5 +1,3 @@
-import gevent
-
 class MidiMapping(object):
     
     def __init__(self, controller):
@@ -32,25 +30,30 @@ class MidiMapping(object):
     def remove(self, channel, note):
         self.map[channel].update({ note: dict() })
     
-    def fire(self, msg):
+    def note_on(self, msg):
         animation = self.animation_for(msg.channel, msg.note)
-        if msg.note in self.map[msg.channel]:
+        try:
             for strip in self.map[msg.channel][msg.note]['strips']:  
-                strip.tasks.put({
+                strip.note_on.put({
                     'animation' : animation,
                     'msg'       : msg,
                     'strip'     : strip,
                     'controller': self.controller
                 })
+        except KeyError:
+            pass
     
-    def expire(self, msg):
-        if msg.note in self.map[msg.channel]:
+    def note_off(self, msg):
+        try:
             for strip in self.map[msg.channel][msg.note]['strips']:
-                if msg.note in strip.holds:
-                    strip.expire.put(msg)
+                strip.note_off.put(msg)
+        except KeyError:
+            pass
 
     def animation_for(self, channel, note):
-        return self.map[channel][note]['animation']
+        if note in self.map[channel]:
+            return self.map[channel][note]['animation']
             
     def inputs_for(self, channel, note):
-        return self.map[channel][note]['inputs']
+        if note in self.map[channel]:
+            return self.map[channel][note]['inputs']

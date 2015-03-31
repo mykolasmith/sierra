@@ -2,15 +2,12 @@ import time
 import opc
 import numpy as np
 
-import gevent
-from gevent.queue import Queue
-
 from controller import MidiController, MixerController
 from mapping import MidiMapping
 from strip import Strip
 from consts import *
 
-from animations import MotionTween, Positional, Clear
+from animations import MotionTween, Positional
 
 class Universe(object):
     
@@ -19,30 +16,25 @@ class Universe(object):
         self.client = client
         self.strips = strips
         self.controllers = controllers
+        self.last_push = time.time()
         
-        # This is the main event loop. A list of coroutines to cycle between.
-        start = []
-        
-        # Start the listeners for each MIDI controller (controller.py)
-        for controller in self.controllers.itervalues():
-            start.append(gevent.spawn(controller.listener))
+        while True:
             
-        
-        for strip in self.strips:
-            # Aggegator combines animation frames into 1 strip frame
-            start.append(gevent.spawn(strip.aggregator))
-            # The worker delegates note_on/note_off actions to the event loop
-            start.append(gevent.spawn(strip.worker))
-            # Firing prepares new task for note_on 
-            start.append(gevent.spawn(strip.firing))
-            # Expiry ends an active event
-            start.append(gevent.spawn(strip.expiry))
+            for controller in self.controllers.itervalues():
+                controller.listen()
             
-        # The writer sends all frames to the network layer
-        start.append(gevent.spawn(self.writer))
-        
-        # Starts the main event loop
-        gevent.joinall(start)
+            now = time.time()
+            for strip in self.strips:
+                strip.handle_expire()
+                strip.handle_note_on()
+                strip.handle_note_off()
+                strip.worker(now)
+                
+            if now - self.last_push >=  1/80.:
+                for strip in self.strips:
+                    strip.aggregate()
+                self.writer()
+                self.last_push = now
     
     def writer(self):
         # OK, this is the slight caveat:
@@ -53,20 +45,20 @@ class Universe(object):
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
         MAX = 300
-        while True:
-            frames = [
-                strip.frame[:MAX]
-                if len(strip.frame) >= MAX
-                else np.concatenate(
-                    [ strip.frame, np.zeros((MAX - strip.length, 3)) ]
-                )
-                for strip in self.strips ]
-            self.client.put_pixels(np.concatenate(frames))
-            gevent.sleep(1/80.)
+        frames = [
+            strip.frame[:MAX]
+            if len(strip.frame) >= MAX
+            else np.concatenate(
+                [ strip.frame, np.zeros((MAX - strip.length, 3)) ]
+            )
+            for strip in self.strips
+        ]
+        self.client.put_pixels(np.concatenate(frames))
 
 if __name__ == '__main__':
     # Open connection to the OPC client.
-    client = opc.Client("beaglebone.local:7890")
+    #client = opc.Client("beaglebone.local:7890")
+    client = opc.Client("localhost:7890")
     if client.can_connect():
         print 'Connected to Beaglebone...'
     
@@ -74,7 +66,47 @@ if __name__ == '__main__':
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
     strips = [
-        Strip(120),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
+        Strip(300),
         Strip(300),
         Strip(300),
         Strip(300),
@@ -83,6 +115,9 @@ if __name__ == '__main__':
         Strip(300),
         Strip(300),
     ]
+    
+    print 'Total number of strips: {0}'.format(len(strips))
+    
     # Create a MIDI controller and declare which MIDI port to listen on.
     mpk49 = MidiController("IAC Driver Bus 1")
     
@@ -117,19 +152,12 @@ if __name__ == '__main__':
                 inputs=[F2,K2,S6],
                 master=True)
                 
-    # I like having one note that I can hit
-    # That clears everything
-    mapping.add(notes=[84],
-                channel=1,
-                animation=Clear,
-                strips=strips)
-                
     # OK, this is ghetto.
     # But I wanted a way use parameters from a DJM-900,
     # So I'm passing those values into the MPK49's "globals".
     # Since I don't really have animations working w/ multiple MIDI controllers yet. TODO
     # nexus = MixerController("DJM-900nexus", mpk49)
-    
+     
     controllers = {
         'mpk49' : mpk49,
     #    'nexus' : nexus
