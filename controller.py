@@ -11,13 +11,9 @@ class MixerController(object):
         
     def listener(self):
         while True:
-            if self.bus.pending(): # Try commenting out?
-                gevent.joinall([
-                    gevent.spawn(self.update_global, msg)
-                    for msg in self.bus.iter_pending()
-                    if msg.type == 'control_change'
-                ])
-            gevent.sleep(0)
+            for msg in self.bus.iter_pending():
+                if msg.type == 'control_change'
+                    self.update_global, msg
             
     def update_global(self, msg):
         if msg.control in [5,10,22,83]:

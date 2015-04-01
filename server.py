@@ -19,7 +19,6 @@ class Universe(object):
         self.last_push = time.time()
         
         while True:
-            
             for controller in self.controllers.itervalues():
                 controller.listen()
             
@@ -29,7 +28,7 @@ class Universe(object):
                 strip.handle_note_on()
                 strip.handle_note_off()
                 strip.worker(now)
-                
+            
             if now - self.last_push >=  1/80.:
                 for strip in self.strips:
                     strip.aggregate()
@@ -45,15 +44,13 @@ class Universe(object):
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
         MAX = 300
-        frames = [
-            strip.frame[:MAX]
-            if len(strip.frame) >= MAX
-            else np.concatenate(
-                [ strip.frame, np.zeros((MAX - strip.length, 3)) ]
-            )
+        pixels = [
+            strip.pixels[:MAX]
+            if len(strip.pixels) >= MAX
+            else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ])
             for strip in self.strips
         ]
-        self.client.put_pixels(np.concatenate(frames))
+        self.client.put_pixels(np.concatenate(pixels))
 
 if __name__ == '__main__':
     # Open connection to the OPC client.

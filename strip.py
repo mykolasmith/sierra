@@ -10,7 +10,7 @@ class Strip(object):
         self.length = length
         
         # Each strip has a master frame that gets aggregated from the active animations' frame
-        self.frame = np.array([(0,0,0)] * length)
+        self.pixels = np.array([(0,0,0)] * length, dtype=np.uint8)
         
         # Keep track of the active animations
         self.active = {}
@@ -30,9 +30,11 @@ class Strip(object):
         # As the maxima of each indice
         # In each animation frame
         if self.active:
-            self.frame = np.maximum.reduce(
-                [ anim.get_frame() for anim in self.active.itervalues() ]
-            )
+            self.pixels = np.maximum.reduce([
+                anim.pixels
+                for anim
+                in self.active.itervalues()
+            ])
             
     def worker(self, now):
         for anim in self.active.itervalues():
@@ -40,7 +42,8 @@ class Strip(object):
                 anim.running = True
                 anim.t0 = now
             if not anim.done:
-                anim.frame = anim.run(now - anim.t0, np.zeros_like(anim.frame))
+                anim.pixels[...] = 0
+                anim.run(now - anim.t0)
             else:
                 self.expire.put(anim)
 

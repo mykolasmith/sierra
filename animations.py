@@ -17,22 +17,17 @@ class Animation(object):
         self.done = False
         self.t0 = None
         
-        self.frame = np.array([(0,0,0)] * strip.length)
+        self.pixels = np.array([(0,0,0)] * strip.length, dtype=np.uint8)
         
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.refresh_params()
         
     def hsb_to_rgb(self, h, s, v, max=127):
-        # Scale hsv by max, e.g. MIDI 1-127 knob, conver to RGB, and return as numpy array
-        return np.array(colorsys.hsv_to_rgb(1.0/max * h, 1.0/max * s, 1.0/max * v)) * 255
-        
-    def get_frame(self):
-        # Apply the master, if we're using it with this controller mapping
-        if self.controller.master:
-            master = self.controller.master_for(self.msg.channel) * (1/127.0)
-            return self.frame * master
-        else:
-            return self.frame
+        # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
+        return np.array(
+            colorsys.hsv_to_rgb(
+                1.0/max * h, 1.0/max * s, 1.0/max * v
+            )) * 255
             
     def refresh_params(self):
         # Get current params from controller
@@ -44,9 +39,9 @@ class Animation(object):
         start = time.time()
         elapsed = 0
         counter = 0
-        while self.frame.any():
+        while self.pixels.any():
             if elapsed > float(decay * counter):
-                self.frame = (self.frame - 5).clip(0)
+                self.pixels = (self.pixels - 5).clip(0)
                 counter += 1
             elapsed = time.time() - start
         
@@ -61,7 +56,7 @@ class Positional(Animation):
         self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * strip.length)
         self.factor = round((5/120.) * self.strip.length)
 
-    def run(self, deltaMs, pixels):
+    def run(self, deltaMs):
         #hue = self.params[0]
         hue = 64
         if self.params[2]:
@@ -75,9 +70,7 @@ class Positional(Animation):
         #brightness = self.params[1]
         brightness = 127
         rgb = self.hsb_to_rgb(hue, saturation, brightness)
-        pixels[self.pos:self.pos+int(self.factor)] = rgb
-        
-        return pixels
+        self.pixels[self.pos:self.pos+int(self.factor)] = rgb
         
 class MotionTween(Animation):
     
@@ -95,11 +88,10 @@ class MotionTween(Animation):
         #speed = self.params[3]
         self.duration = 2.0
         
-    def run(self, deltaMs, pixels):
+    def run(self, deltaMs):
         frame = int(self.num_frames * (deltaMs / self.duration))
         if frame > self.num_frames:
             self.done = True
-            return np.zeros_like(pixels)
             
         if self.refresh_enabled:
             self.refresh_params()
@@ -124,12 +116,10 @@ class MotionTween(Animation):
             factor = (1 - (float(offset) / len(self.trail)))
             try:
                 if self.pitch >= 0 and frame - offset > 0:
-                    pixels[frame-offset] = rgb * factor
-                    pixels[frame - len(self.trail)] = [0,0,0]
+                    self.pixels[frame-offset] = rgb * factor
+                    self.pixels[frame - len(self.trail)] = [0,0,0]
                 if self.pitch < 0 and offset - i < 0:
-                    pixels[offset-frame] = rgb * factor
-                    pixels[-frame + len(self.trail)] = [0,0,0]
+                    self.pixels[offset-frame] = rgb * factor
+                    self.pixels[-frame + len(self.trail)] = [0,0,0]
             except:
                 pass
-    
-        return pixels
