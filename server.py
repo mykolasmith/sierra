@@ -7,7 +7,7 @@ from mapping import MidiMapping
 from strip import Strip
 from consts import *
 
-from animations import MotionTween, Positional
+from animations import MotionTween, Positional, Rainbow
 
 class Universe(object):
     
@@ -24,7 +24,6 @@ class Universe(object):
             
             now = time.time()
             for strip in self.strips:
-                strip.handle_expire()
                 strip.handle_note_on()
                 strip.handle_note_off()
                 strip.worker(now)
@@ -32,26 +31,26 @@ class Universe(object):
             if now - self.last_push >=  1/80.:
                 for strip in self.strips:
                     strip.aggregate()
+                    strip.handle_expire()
                 self.writer()
                 self.last_push = now
-    
+            
     def writer(self):
         # OK, this is the slight caveat:
         #   Since LEDscape is optimized to receive a single frame
         #   consisting of the entire frame buffer,
-        #   that is a consistent length (e.g. 8 strips, 300 leds each),
+        #   that is a consistent length (e.g. 8 strips, 600 leds each),
         #   we need to fill some blank indices,
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
-        MAX = 300
-        pixels = [
+        MAX = 455
+        self.client.put_pixels(np.concatenate([
             strip.pixels[:MAX]
             if len(strip.pixels) >= MAX
             else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ])
             for strip in self.strips
-        ]
-        self.client.put_pixels(np.concatenate(pixels))
-
+        ])[:21845]) # OPC can only handle 21,845 pixels at a time.
+        
 if __name__ == '__main__':
     # Open connection to the OPC client.
     #client = opc.Client("beaglebone.local:7890")
@@ -62,58 +61,14 @@ if __name__ == '__main__':
     # Declare length of each strip.
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
-    strips = [
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-        Strip(300),
-    ]
+    bbb_1 = [ Strip(x) for x in [455] * 48 ]
     
-    print 'Total number of strips: {0}'.format(len(strips))
+    pixels = 0
+    for strip in bbb_1:
+        pixels += strip.length
+    
+    print 'Total number of strips: {0}'.format(len(bbb_1))
+    print 'Total number of pixels: {0}/{1}'.format(pixels, 21845)
     
     # Create a MIDI controller and declare which MIDI port to listen on.
     mpk49 = MidiController("IAC Driver Bus 1")
@@ -133,10 +88,23 @@ if __name__ == '__main__':
     mapping.add(notes=[60],
                 channel=1,
                 animation=MotionTween,
-                strips=strips,
+                strips=bbb_1,
                 inputs=[F1,K1,S1,F8,S6],
                 master=True,
                 pitchwheel=True)
+                
+    mapping.add(notes=[62],
+                channel=1,
+                animation=MotionTween,
+                strips=[ bbb_1[0] ],
+                inputs=[F1,K1,S1,F8,S6],
+                master=True,
+                pitchwheel=True)
+                
+    mapping.add(notes=[64],
+                channel=1,
+                animation=Rainbow,
+                strips=bbb_1)
                 
     # When any note between 36 and 59 on channel 1 is pressed
     # Run a Positional animation class
@@ -145,7 +113,7 @@ if __name__ == '__main__':
     mapping.add(notes=xrange(36,59),
                 channel=1,
                 animation=Positional,
-                strips=strips,
+                strips=bbb_1,
                 inputs=[F2,K2,S6],
                 master=True)
                 
@@ -160,4 +128,4 @@ if __name__ == '__main__':
     #    'nexus' : nexus
     }
     
-    universe = Universe(client, strips, controllers)
+    universe = Universe(client, bbb_1, controllers)

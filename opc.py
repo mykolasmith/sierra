@@ -1,39 +1,5 @@
-#!/usr/bin/env python
-
-"""Python Client library for Open Pixel Control
-http://github.com/zestyping/openpixelcontrol
-
-Sends pixel values to an Open Pixel Control server to be displayed.
-http://openpixelcontrol.org/
-
-Recommended use:
-
-    import opc
-
-    # Create a client object
-    client = opc.Client('localhost:7890')
-
-    # Test if it can connect (optional)
-    if client.can_connect():
-        print 'connected to %s' % ADDRESS
-    else:
-        # We could exit here, but instead let's just print a warning
-        # and then keep trying to send pixels in case the server
-        # appears later
-        print 'WARNING: could not connect to %s' % ADDRESS
-
-    # Send pixels forever at 30 frames per second
-    while True:
-        my_pixels = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
-        if client.put_pixels(my_pixels, channel=0):
-            print '...'
-        else:
-            print 'not connected'
-        time.sleep(1/30.0)
-
-"""
-
 import socket
+import numpy as np
 
 class Client(object):
 
@@ -144,16 +110,9 @@ class Client(object):
             return False
 
         # build OPC message
-        len_hi_byte = int(len(pixels)*3 / 256)
-        len_lo_byte = (len(pixels)*3) % 256
-        header = chr(channel) + chr(0) + chr(len_hi_byte) + chr(len_lo_byte)
-        pieces = [header]
-        for r, g, b in pixels:
-            r = min(255, max(0, int(r)))
-            g = min(255, max(0, int(g)))
-            b = min(255, max(0, int(b)))
-            pieces.append(chr(r) + chr(g) + chr(b))
-        message = ''.join(pieces)
+        len_hi_byte = (len(pixels) * 3) / 256
+        len_lo_byte = (len(pixels) * 3) % 256
+        message = chr(channel) + chr(0) + chr(len_hi_byte) + chr(len_lo_byte) + pixels.tobytes()
 
         self._debug('put_pixels: sending pixels to server')
         try:

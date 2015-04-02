@@ -1,6 +1,7 @@
 import numpy as np
 
 import time
+import math
 import colorsys
 
 import gevent
@@ -21,6 +22,9 @@ class Animation(object):
         
         self.inputs = controller.mapping.inputs_for(msg.channel, msg.note)
         self.refresh_params()
+        
+    def run(self, deltaMs):
+        pass
         
     def hsb_to_rgb(self, h, s, v, max=127):
         # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
@@ -71,6 +75,18 @@ class Positional(Animation):
         brightness = 127
         rgb = self.hsb_to_rgb(hue, saturation, brightness)
         self.pixels[self.pos:self.pos+int(self.factor)] = rgb
+        
+class Rainbow(Animation):
+    
+    def __init__(self,strip,controller,msg):
+        super(Rainbow, self).__init__(strip, controller, msg, 'toggle')
+    
+    def run(self, deltaMs):
+        for led in range(self.strip.length):
+            r = math.sin(led * .2 + (deltaMs * 10)) * 127 + 128
+            g = math.sin(led * .2 + (deltaMs * 10) + 2) * 127 + 128
+            b = math.sin(led * .2 + (deltaMs * 10) + 4) * 127 + 128
+            self.pixels[-led] = [r,g,b]
         
 class MotionTween(Animation):
     

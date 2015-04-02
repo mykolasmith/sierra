@@ -47,25 +47,38 @@ class Strip(object):
             else:
                 self.expire.put(anim)
 
+    # For oneshots, each animation is unique and should be removed after completion
+    # For holds, the note_on/note_off message determines whether the animation is active or not
     def handle_note_on(self):
         while not self.note_on.empty():
             task = self.note_on.get()
-            anim = task['animation'](task['strip'], task['controller'], task['msg'])
+            
+            anim = self.active.get(task['msg'].note,
+                task['animation'](task['strip'], task['controller'], task['msg'])
+            )
+            
+            if anim.trigger == 'toggle':
+                if not anim.running:
+                    self.active.update({ task['msg'].note : anim })
+                else:
+                    anim.pixels[...] = 0
+                    anim.done = True
             
             if anim.trigger == 'oneshot':
-            # For oneshots, each animation is unique and show be removed after the whole thing has completed
-                anim.strip.active.update({ id(anim) : anim })
-                
+                self.active.update({ id(anim) : anim })
+            
             if anim.trigger == 'hold':
-            # For holds, the note_on/note_off message determines whether the animation is active or not
-                anim.strip.active.update({ anim.msg.note : anim })
+                self.active.update({ task['msg'].note : anim })
                 
     def handle_note_off(self):
         while not self.note_off.empty():
             msg = self.note_off.get()
             anim = self.active.get(msg.note)
-            if msg.note in self.active:
-                anim.frame = np.zeros_like(anim.frame)
+            if anim and anim.trigger == 'toggle':
+                break
+                
+            if anim and msg.note in self.active:
+                anim.pixels[...] = 0
                 anim.done = True
                 
     def handle_expire(self):

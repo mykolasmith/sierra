@@ -12,7 +12,7 @@ class MixerController(object):
     def listener(self):
         while True:
             for msg in self.bus.iter_pending():
-                if msg.type == 'control_change'
+                if msg.type == 'control_change':
                     self.update_global, msg
             
     def update_global(self, msg):
