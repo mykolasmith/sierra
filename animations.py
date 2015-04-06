@@ -26,6 +26,9 @@ class Animation(object):
     def run(self, deltaMs):
         pass
         
+    def off(self, deltaMs):
+        pass
+        
     def hsb_to_rgb(self, h, s, v, max=127):
         # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
         return np.array(
@@ -37,18 +40,6 @@ class Animation(object):
         # Get current params from controller
         self.params = self.controller.controls_for(self.msg.channel, self.inputs)
         
-    def fade_down(self, decay=0.01):
-        # Drop the brightness of each led by 5 at a given rate of decay
-        # This should probably go somewhere else...
-        start = time.time()
-        elapsed = 0
-        counter = 0
-        while self.pixels.any():
-            if elapsed > float(decay * counter):
-                self.pixels = (self.pixels - 5).clip(0)
-                counter += 1
-            elapsed = time.time() - start
-        
 class Positional(Animation):
     
     def __init__(self, strip, controller, msg):
@@ -57,6 +48,7 @@ class Positional(Animation):
         self.min = 36
         self.max = 59
         
+        self.decay = 5.0
         self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * strip.length)
         self.factor = round((5/120.) * self.strip.length)
 
@@ -75,6 +67,13 @@ class Positional(Animation):
         brightness = 127
         rgb = self.hsb_to_rgb(hue, saturation, brightness)
         self.pixels[self.pos:self.pos+int(self.factor)] = rgb
+        
+    def off(self, deltaMs):
+        if self.pixels.any() and deltaMs < self.decay:
+            factor = 1 - (deltaMs / self.decay)
+            self.pixels = (self.pixels * factor)
+        else:
+            self.done = True
         
 class Rainbow(Animation):
     
@@ -106,8 +105,9 @@ class MotionTween(Animation):
         
     def run(self, deltaMs):
         frame = int(self.num_frames * (deltaMs / self.duration))
-        if frame > self.num_frames:
+        if frame >= self.num_frames:
             self.done = True
+            return
             
         if self.refresh_enabled:
             self.refresh_params()

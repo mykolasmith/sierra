@@ -6,7 +6,7 @@ from gevent.queue import Queue
 class Strip(object):
     
     def __init__(self, length):
-        print 'Created strip %s of length %s' % (self, length)
+        # print 'Created strip %s of length %s' % (self, length)
         self.length = length
         
         # Each strip has a master frame that gets aggregated from the active animations' frame
@@ -38,14 +38,17 @@ class Strip(object):
             
     def worker(self, now):
         for anim in self.active.itervalues():
+            
             if not anim.running:
                 anim.running = True
                 anim.t0 = now
-            if not anim.done:
-                anim.pixels[...] = 0
-                anim.run(now - anim.t0)
-            else:
+                
+            if anim.done:
                 self.expire.put(anim)
+            else:
+                if anim.run != anim.off:
+                    anim.pixels[...] = 0
+                anim.run(now - anim.t0)
 
     # For oneshots, each animation is unique and should be removed after completion
     # For holds, the note_on/note_off message determines whether the animation is active or not
@@ -53,38 +56,40 @@ class Strip(object):
         while not self.note_on.empty():
             task = self.note_on.get()
             
-            anim = self.active.get(task['msg'].note,
-                task['animation'](task['strip'], task['controller'], task['msg'])
-            )
+            current = self.active.get(task['msg'].note)
+            if current:
+                if current.trigger == 'toggle':
+                    current.pixels[...] = 0
+                    current.done = True
+                    break
+                    
+                else:
+                    self.active.pop(task['msg'].note)
+                    
+            anim = task['animation'](task['strip'], task['controller'], task['msg'])
             
             if anim.trigger == 'toggle':
-                if not anim.running:
-                    self.active.update({ task['msg'].note : anim })
-                else:
-                    anim.pixels[...] = 0
-                    anim.done = True
-            
-            if anim.trigger == 'oneshot':
+                self.active.update({ task['msg'].note : anim })
+            elif anim.trigger == 'oneshot':
                 self.active.update({ id(anim) : anim })
-            
-            if anim.trigger == 'hold':
+            elif anim.trigger == 'hold':
                 self.active.update({ task['msg'].note : anim })
                 
     def handle_note_off(self):
         while not self.note_off.empty():
             msg = self.note_off.get()
             anim = self.active.get(msg.note)
-            if anim and anim.trigger == 'toggle':
-                break
+            if anim:
+                if anim.trigger == 'toggle':
+                    break
                 
-            if anim and msg.note in self.active:
-                anim.pixels[...] = 0
-                anim.done = True
+                if anim.trigger == 'hold':
+                    anim.run = anim.off
                 
     def handle_expire(self):
         while not self.expire.empty():
             expire = self.expire.get()
             if expire.msg.note in self.active:
                 self.active.pop(expire.msg.note)
-            if id(expire) in self.active:
+            elif id(expire) in self.active:
                 self.active.pop(id(expire))

@@ -28,12 +28,12 @@ class Universe(object):
                 strip.handle_note_off()
                 strip.worker(now)
             
-            if now - self.last_push >=  1/80.:
+            if time.time() - self.last_push >=  1/80.:
                 for strip in self.strips:
                     strip.aggregate()
                     strip.handle_expire()
                 self.writer()
-                self.last_push = now
+                self.last_push = time.time()
             
     def writer(self):
         # OK, this is the slight caveat:
@@ -43,11 +43,11 @@ class Universe(object):
         #   we need to fill some blank indices,
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
-        MAX = 455
+        MAX = 300                                   
         self.client.put_pixels(np.concatenate([
-            strip.pixels[:MAX]
+            strip.pixels[:MAX].astype(np.uint8)
             if len(strip.pixels) >= MAX
-            else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ])
+            else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ]).astype(np.uint8)
             for strip in self.strips
         ])[:21845]) # OPC can only handle 21,845 pixels at a time.
         
@@ -61,7 +61,7 @@ if __name__ == '__main__':
     # Declare length of each strip.
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
-    bbb_1 = [ Strip(x) for x in [455] * 48 ]
+    bbb_1 = [ Strip(x) for x in [300] * 48 ]
     
     pixels = 0
     for strip in bbb_1:
