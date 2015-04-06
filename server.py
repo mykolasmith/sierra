@@ -11,10 +11,9 @@ from animations import MotionTween, Positional, Rainbow
 
 class Universe(object):
     
-    def __init__(self, client, strips, controllers):
+    def __init__(self, beaglebones, controllers):
         print 'Starting Universe...'
-        self.client = client
-        self.strips = strips
+        self.beaglebones = beaglebones
         self.controllers = controllers
         self.last_push = time.time()
         
@@ -23,13 +22,14 @@ class Universe(object):
                 controller.listen()
             
             now = time.time()
-            for strip in self.strips:
-                strip.handle_note_on()
-                strip.handle_note_off()
-                strip.worker(now)
+            for beaglebone in self.beaglebones.itervalues():
+                for strip in beaglebone.strips:
+                    strip.handle_note_on()
+                    strip.handle_note_off()
+                    strip.worker(now)
             
             if time.time() - self.last_push >=  1/80.:
-                for strip in self.strips:
+                for strip in beaglebone.strips:
                     strip.aggregate()
                     strip.handle_expire()
                 self.writer()
@@ -43,32 +43,42 @@ class Universe(object):
         #   we need to fill some blank indices,
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
-        MAX = 300                                   
-        self.client.put_pixels(np.concatenate([
-            strip.pixels[:MAX].astype(np.uint8)
-            if len(strip.pixels) >= MAX
-            else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ]).astype(np.uint8)
-            for strip in self.strips
-        ])[:21845]) # OPC can only handle 21,845 pixels at a time.
+        MAX = 300
+        for beaglebone in self.beaglebones.itervalues():
+            beaglebone.client.put_pixels(np.concatenate([
+                strip.pixels[:MAX].astype(np.uint8)
+                if len(strip.pixels) >= MAX
+                else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ]).astype(np.uint8)
+                for strip in beaglebone.strips
+            ])[:21845]) # OPC can only handle 21,845 pixels at a time.
+        
+class Client(object):
+    
+    def __init__(self, location, strips):
+        self.strips = strips
+        self.client = opc.Client(location)
+        if self.client.can_connect():
+            print 'Connected to Beaglebone at: {0}'.format(location)
         
 if __name__ == '__main__':
     # Open connection to the OPC client.
     #client = opc.Client("beaglebone.local:7890")
-    client = opc.Client("localhost:7890")
-    if client.can_connect():
-        print 'Connected to Beaglebone...'
     
     # Declare length of each strip.
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
-    bbb_1 = [ Strip(x) for x in [300] * 48 ]
+    strips1 = [ Strip(x) for x in [300] * 48 ]
+    strips2 = [ Strip(x) for x in [300] * 48 ]
     
-    pixels = 0
-    for strip in bbb_1:
-        pixels += strip.length
+    local = Client("localhost:7890", strips1)
+    #bbb1 = Client("beaglebone1.local", strips1)
+    #bbb2 = Client("beaglebone2.local", strips2)
     
-    print 'Total number of strips: {0}'.format(len(bbb_1))
-    print 'Total number of pixels: {0}/{1}'.format(pixels, 21845)
+    clients = {
+        0 : local,
+        #1 : bbb1,
+        #2 : bbb2
+    }
     
     # Create a MIDI controller and declare which MIDI port to listen on.
     mpk49 = MidiController("IAC Driver Bus 1")
@@ -88,7 +98,7 @@ if __name__ == '__main__':
     mapping.add(notes=[60],
                 channel=1,
                 animation=MotionTween,
-                strips=bbb_1,
+                strips=strips1,
                 inputs=[F1,K1,S1,F8,S6],
                 master=True,
                 pitchwheel=True)
@@ -96,7 +106,7 @@ if __name__ == '__main__':
     mapping.add(notes=[62],
                 channel=1,
                 animation=MotionTween,
-                strips=[ bbb_1[0] ],
+                strips=strips1,
                 inputs=[F1,K1,S1,F8,S6],
                 master=True,
                 pitchwheel=True)
@@ -104,7 +114,7 @@ if __name__ == '__main__':
     mapping.add(notes=[64],
                 channel=1,
                 animation=Rainbow,
-                strips=bbb_1)
+                strips=strips1)
                 
     # When any note between 36 and 59 on channel 1 is pressed
     # Run a Positional animation class
@@ -113,7 +123,7 @@ if __name__ == '__main__':
     mapping.add(notes=xrange(36,59),
                 channel=1,
                 animation=Positional,
-                strips=bbb_1,
+                strips=strips1,
                 inputs=[F2,K2,S6],
                 master=True)
                 
@@ -128,4 +138,4 @@ if __name__ == '__main__':
     #    'nexus' : nexus
     }
     
-    universe = Universe(client, bbb_1, controllers)
+    universe = Universe(clients, controllers)
