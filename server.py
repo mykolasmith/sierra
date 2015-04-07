@@ -2,38 +2,42 @@ import time
 import opc
 import numpy as np
 
-from controller import MidiController, MixerController
 from mapping import MidiMapping
 from strip import Strip
-from consts import *
+from consts import MPK49_MAPPINGS
+from controller import MasterController, MidiController
 
 from animations import MotionTween, Positional, Rainbow
 
 class Universe(object):
-    
-    def __init__(self, beaglebones, controllers):
+
+    def __init__(self, clients, controllers):
         print 'Starting Universe...'
-        self.beaglebones = beaglebones
+        self.clients = clients
         self.controllers = controllers
         self.last_push = time.time()
+        
+        for client in self.clients.itervalues():
+            for strip in client.strips:
+                strip.bind(self.controllers)
         
         while True:
             for controller in self.controllers.itervalues():
                 controller.listen()
             
             now = time.time()
-            for beaglebone in self.beaglebones.itervalues():
-                for strip in beaglebone.strips:
-                    strip.handle_note_on()
-                    strip.handle_note_off()
+            for client in self.clients.itervalues():
+                for strip in client.strips:
+                    strip.handle_note_on(now)
+                    strip.handle_note_off(now)
                     strip.worker(now)
             
-            if time.time() - self.last_push >=  1/80.:
-                for strip in beaglebone.strips:
+            if now - self.last_push >=  1/80.:
+                for strip in client.strips:
                     strip.aggregate()
                     strip.handle_expire()
                 self.writer()
-                self.last_push = time.time()
+                self.last_push = now
             
     def writer(self):
         # OK, this is the slight caveat:
@@ -43,22 +47,26 @@ class Universe(object):
         #   we need to fill some blank indices,
         #   when a srip is shorter than the max.
         # There might be a better way to do this with numpy. TODO
-        MAX = 300
-        for beaglebone in self.beaglebones.itervalues():
-            beaglebone.client.put_pixels(np.concatenate([
+        MAX = 1000
+        for client in self.clients.itervalues():
+            client.bus.put_pixels(np.concatenate([
                 strip.pixels[:MAX].astype(np.uint8)
                 if len(strip.pixels) >= MAX
                 else np.concatenate([ strip.pixels, np.zeros((MAX - strip.length, 3)) ]).astype(np.uint8)
-                for strip in beaglebone.strips
+                for strip in client.strips
             ])[:21845]) # OPC can only handle 21,845 pixels at a time.
+            
+
         
 class Client(object):
     
     def __init__(self, location, strips):
         self.strips = strips
-        self.client = opc.Client(location)
-        if self.client.can_connect():
-            print 'Connected to Beaglebone at: {0}'.format(location)
+        self.bus = opc.Client(location)
+        if self.bus.can_connect():
+            print 'Connected to client: {0}'.format(location)
+        else:
+            print 'Not connected to client: {0}'.format(location)
         
 if __name__ == '__main__':
     # Open connection to the OPC client.
@@ -67,12 +75,14 @@ if __name__ == '__main__':
     # Declare length of each strip.
     # There is absolutely no geometry support yet. TODO
     # Index refers to the beaglebone channel (0-48).
-    strips1 = [ Strip(x) for x in [300] * 48 ]
-    strips2 = [ Strip(x) for x in [300] * 48 ]
+    strips1 = [ Strip(x) for x in [455] * 48 ]
+    strips2 = [ Strip(x) for x in [455] * 48 ]
+    strips3 = [ Strip(x) for x in [455] * 48 ]
+    strips4 = [ Strip(x) for x in [455] * 48 ]
     
-    local = Client("localhost:7890", strips1)
-    #bbb1 = Client("beaglebone1.local", strips1)
-    #bbb2 = Client("beaglebone2.local", strips2)
+    local = Client("localhost:7890", strips1 + strips2 + strips3 + strips4)
+    #bbb1 = Client("beaglebone1.local:7890", strips1)
+    #bbb2 = Client("beaglebone2.local:7890", strips2)
     
     clients = {
         0 : local,
@@ -80,62 +90,46 @@ if __name__ == '__main__':
         #2 : bbb2
     }
     
+    total_pixels = 0
+    for client in clients.itervalues():
+        for strip in client.strips:
+            total_pixels += strip.length
+            
+    total_strips = 0
+    for client in clients.itervalues():
+        total_strips += len(client.strips)
+            
+    print 'Total strips in universe: {0}'.format(total_strips)
+    print 'Total pixels in universe: {0}'.format(total_pixels)
+    
     # Create a MIDI controller and declare which MIDI port to listen on.
-    mpk49 = MidiController("IAC Driver Bus 1")
+    mpk49 = MidiController("IAC Driver Bus 1", MPK49_MAPPINGS)
+    nexus = MidiController("IAC Driver Bus 2")
     
-    # Add a note->animation mapping for the controller.
-    mapping = MidiMapping(mpk49)
+    mpk49.add_trigger(
+        notes=[60],
+        channel=1,
+        animation=MotionTween,
+        strips=strips1
+    )
     
-    # This part is a bit tedious.
-    # Thinking about doing a spatially aware mapping GUI using my Project Tango. TODO
+    mpk49.add_trigger(
+        notes=xrange(36,59),
+        channel=1,
+        animation=Positional,
+        strips=strips1
+    )
     
-    # When channel 1, note 60 is pressed
-    # Run a MotionTween animation class
-    # Across all the strips
-    # Using a variety of the MPK49's inputs
-    # With respect to the master brightness
-    # And the pitchweel's position
-    mapping.add(notes=[60],
-                channel=1,
-                animation=MotionTween,
-                strips=strips1,
-                inputs=[F1,K1,S1,F8,S6],
-                master=True,
-                pitchwheel=True)
-                
-    mapping.add(notes=[62],
-                channel=1,
-                animation=MotionTween,
-                strips=strips1,
-                inputs=[F1,K1,S1,F8,S6],
-                master=True,
-                pitchwheel=True)
-                
-    mapping.add(notes=[64],
-                channel=1,
-                animation=Rainbow,
-                strips=strips1)
-                
-    # When any note between 36 and 59 on channel 1 is pressed
-    # Run a Positional animation class
-    # This is how I do something like playing a chord
-    # To have the corresponding indices light up
-    mapping.add(notes=xrange(36,59),
-                channel=1,
-                animation=Positional,
-                strips=strips1,
-                inputs=[F2,K2,S6],
-                master=True)
-                
-    # OK, this is ghetto.
-    # But I wanted a way use parameters from a DJM-900,
-    # So I'm passing those values into the MPK49's "globals".
-    # Since I don't really have animations working w/ multiple MIDI controllers yet. TODO
-    # nexus = MixerController("DJM-900nexus", mpk49)
-     
-    controllers = {
+    mpk49.add_trigger(
+        notes=[62],
+        channel=1,
+        animation=Rainbow,
+        strips=strips1
+    )
+   
+    controllers = MasterController({
         'mpk49' : mpk49,
-    #    'nexus' : nexus
-    }
+        'nexus' : nexus
+    })
     
     universe = Universe(clients, controllers)

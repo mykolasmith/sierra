@@ -1,6 +1,8 @@
 import numpy as np
 import time
 
+from controller import MasterController
+
 from gevent.queue import Queue
 
 class Strip(object):
@@ -24,6 +26,11 @@ class Strip(object):
         
         # Gevent Queue for pending note_off messages
         self.expire = Queue()
+        
+    def bind(self, *args):
+        for item in args:
+            if type(item) == MasterController:
+                self.controllers = item
 
     def aggregate(self):
         # Set the strip frame
@@ -38,35 +45,34 @@ class Strip(object):
             
     def worker(self, now):
         for anim in self.active.itervalues():
-            
+        
             if not anim.running:
                 anim.running = True
                 anim.t0 = now
-                
+    
             if anim.done:
                 self.expire.put(anim)
             else:
                 if anim.run != anim.off:
                     anim.pixels[...] = 0
                 anim.run(now - anim.t0)
-
+                
     # For oneshots, each animation is unique and should be removed after completion
     # For holds, the note_on/note_off message determines whether the animation is active or not
-    def handle_note_on(self):
+    def handle_note_on(self, now):
         while not self.note_on.empty():
             task = self.note_on.get()
             
             current = self.active.get(task['msg'].note)
             if current:
                 if current.trigger == 'toggle':
-                    current.pixels[...] = 0
-                    current.done = True
+                    current.t0 = now
+                    current.run = current.off
                     break
-                    
                 else:
                     self.active.pop(task['msg'].note)
                     
-            anim = task['animation'](task['strip'], task['controller'], task['msg'])
+            anim = task['animation'](task['strip'], self.controllers, task['msg'])
             
             if anim.trigger == 'toggle':
                 self.active.update({ task['msg'].note : anim })
@@ -75,7 +81,7 @@ class Strip(object):
             elif anim.trigger == 'hold':
                 self.active.update({ task['msg'].note : anim })
                 
-    def handle_note_off(self):
+    def handle_note_off(self, now):
         while not self.note_off.empty():
             msg = self.note_off.get()
             anim = self.active.get(msg.note)
@@ -84,6 +90,7 @@ class Strip(object):
                     break
                 
                 if anim.trigger == 'hold':
+                    anim.t0 = now
                     anim.run = anim.off
                 
     def handle_expire(self):
