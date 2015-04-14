@@ -49,7 +49,7 @@ class MidiController(object):
                 strip.note_off.put(msg)
             
     def update_control(self, msg):
-        self.controls.update({ msg.channel: { msg.control : msg.value } })
+        self.controls[msg.channel][msg.control] = msg.value
         
     def get(self, param_name, default):
         param = self.mappings.get(param_name)

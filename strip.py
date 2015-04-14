@@ -65,12 +65,12 @@ class Strip(object):
             
             current = self.active.get(task['msg'].note)
             if current:
-                if current.trigger == 'toggle':
+                if current.trigger == 'toggle' and current.run != current.off:
                     current.t0 = now
+                    current.pixels_at_inflection = current.pixels
                     current.run = current.off
                     break
-                else:
-                    self.active.pop(task['msg'].note)
+                self.active.pop(task['msg'].note)
                     
             anim = task['animation'](task['strip'], self.controllers, task['msg'])
             
@@ -91,6 +91,7 @@ class Strip(object):
                 
                 if anim.trigger == 'hold':
                     anim.t0 = now
+                    anim.pixels_at_inflection = anim.pixels
                     anim.run = anim.off
                 
     def handle_expire(self):
