@@ -64,8 +64,8 @@ class MasterController(object):
         
     def bind(self, *args):
         for item in args:
-            for controller in self.controllers.itervalues():
-                if type(item) == Handler:
+            if type(item) == Handler:
+                for controller in self.controllers.itervalues():
                     controller.handler = item
                 
     def via_channel(self, channel):

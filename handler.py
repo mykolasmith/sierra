@@ -5,6 +5,7 @@ class Handler(object):
     def __init__(self, strips, controllers):
         self.strips = strips
         self.controllers = controllers
+        
         self.on = Queue()
         self.off = Queue()
         self.expiry = Queue()

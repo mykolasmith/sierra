@@ -9,9 +9,8 @@ from controller import MasterController, MidiController
 
 from animations import MotionTween, Positional, Rainbow
 
-# Per LEDscape spec, all strips must be of equal length
 NUM_PIXELS = 300
-FPS = 1/60.
+FPS = 1/120.
 
 class Universe(object):
 
@@ -22,6 +21,7 @@ class Universe(object):
         controllers.bind(handler)
         
         while True:
+            
             for controller in controllers.itervalues():
                 controller.listen()
                 
@@ -30,25 +30,23 @@ class Universe(object):
             handler.note_off(now)
             handler.worker(now)
             
-            #handler.print_active()
-            
             for strip in strips:
                 strip.aggregate()
-                
-            handler.expire()
             
+            handler.expire()
+           
             for client in clients:
-                if client.connected and now - client.last_push >= FPS:
-                        client.bus.put_pixels(
-                            np.concatenate([
-                                strip.pixels[:NUM_PIXELS].astype(np.uint8)
-                                if len(strip.pixels) >= NUM_PIXELS
-                                else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
-                                for strip in client.strips
-                            ])[:21845]
-                        )
-                        
-                        client.last_push = now
+                if client.connected:
+                    client.bus.put_pixels(
+                        np.concatenate([
+                            strip.pixels[:NUM_PIXELS].astype(np.uint8)
+                            if len(strip.pixels) >= NUM_PIXELS
+                            else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
+                            for strip in client.strips
+                        ])[:21845]
+                    )
+            
+            time.sleep(FPS)
         
 class Client(object):
     
@@ -56,7 +54,6 @@ class Client(object):
         self.bus = opc.Client(location)
         self.local = local
         self.strips = strips
-        self.last_push = time.time()
         
         if self.bus.can_connect():
             print 'Connected to client: {0}'.format(location)
@@ -67,11 +64,7 @@ class Client(object):
         
 if __name__ == '__main__':
     
-    #strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
-    strips1 = tuple( Strip(x) for x in [300] * 48 )
-    strips2 = tuple( Strip(x) for x in [300] * 48 )
-    
-    strips = strips1 + strips2
+    strips = tuple( Strip(x) for x in [NUM_PIXELS] * 1000 )
     
     simulation = Client("localhost:7890", strips)
     #beaglebone = Client("beaglebone.local:7890", strips)
