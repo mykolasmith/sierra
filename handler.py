@@ -5,9 +5,9 @@ class Handler(object):
     def __init__(self, strips, controllers):
         self.strips = strips
         self.controllers = controllers
-        self.note_on = Queue()
-        self.note_off = Queue()
-        self.expire = Queue()
+        self.on = Queue()
+        self.off = Queue()
+        self.expiry = Queue()
         
         self.active = {}
         
@@ -23,15 +23,15 @@ class Handler(object):
                     anim.t0 = now
     
                 if anim.done:
-                    self.expire.put(anim)
+                    self.expiry.put(anim)
                 else:
                     if anim.run != anim.off:
                         anim.pixels[...] = 0
                     anim.run(now - anim.t0)
         
-    def handle_note_on(self, now):
-        while not self.note_on.empty():
-            task = self.note_on.get()
+    def note_on(self, now):
+        while not self.on.empty():
+            task = self.on.get()
             current = self.active.get(task['msg'].note)
             
             if current:
@@ -53,7 +53,7 @@ class Handler(object):
             lengths = set( strip.length for strip in task['strips'])
             
             for length in lengths:
-                anim = task['animation'](length, self.controllers, task['msg'])
+                anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
                 if anim.trigger == 'toggle':
                     if anim.msg.note in self.active:
                         break
@@ -79,9 +79,9 @@ class Handler(object):
                         if strip.length == anim.length
                     ]
             
-    def handle_note_off(self, now):
-        while not self.note_off.empty():
-            msg = self.note_off.get()
+    def note_off(self, now):
+        while not self.off.empty():
+            msg = self.off.get()
             current = self.active.get(msg.note)
             if current:
                 for anim in current.itervalues():
@@ -95,9 +95,9 @@ class Handler(object):
                         anim.run = anim.off
                     
                 
-    def handle_expire(self):
-        while not self.expire.empty():
-            expire = self.expire.get()
+    def expire(self):
+        while not self.expiry.empty():
+            expire = self.expiry.get()
             if expire.msg.note in self.active:
                 group = self.active.pop(expire.msg.note)
                 for anim in group.itervalues():

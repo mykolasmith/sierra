@@ -8,11 +8,14 @@ import gevent
 
 class Animation(object):
     
-    def __init__(self, length, controllers, msg, trigger):
+    def __init__(self, length, controllers, msg, notes, trigger):
         self.length = length
+        
         self.controllers = controllers
         self.controllers.via_channel(msg.channel)
+        
         self.msg = msg
+        self.notes = notes
         self.trigger = trigger
         
         self.running = False
@@ -50,20 +53,20 @@ class Animation(object):
             
 class Fidget(Animation):
     
-    def __init__(self, strip, controllers, msg):
-        super(Fidget, self).__init__(strip, controllers, msg, 'hold')
+    def __init__(self, strip, controllers, msg, notes):
+        super(Fidget, self).__init__(strip, controllers, msg, notes, 'hold')
         
 class Positional(Animation):
     
-    def __init__(self, strip, controllers, msg):
-        super(Positional, self).__init__(strip, controllers, msg, 'hold')
+    def __init__(self, strip, controllers, msg, notes):
+        super(Positional, self).__init__(strip, controllers, msg, notes, 'hold')
         
-        self.min = 36
-        self.max = 59
+        self.min = min(notes)
+        self.max = max(notes)
         
         self.decay = 1.0
         self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * self.length)
-        self.factor = round((5/120.) * self.length)
+        self.factor = round((1.0 / (self.max - self.min)) * self.length)
 
     def run(self, deltaMs):
         hue = self.controllers.get("mpk49", "F1", 64)
@@ -78,8 +81,8 @@ class Positional(Animation):
         
 class Rainbow(Animation):
     
-    def __init__(self,strip,controllers,msg):
-        super(Rainbow, self).__init__(strip, controllers, msg, 'toggle')
+    def __init__(self, length, controllers, msg, notes):
+        super(Rainbow, self).__init__(length, controllers, msg, notes, 'toggle')
         self.decay = 1.0
     
     def run(self, deltaMs):
@@ -96,8 +99,8 @@ class Rainbow(Animation):
 
 class MotionTween(Animation):
     
-    def __init__(self, strip, controllers, msg):
-        super(MotionTween, self).__init__(strip, controllers, msg, 'oneshot')
+    def __init__(self, strip, controllers, msg, notes):
+        super(MotionTween, self).__init__(strip, controllers, msg, notes, 'oneshot')
         self.trail = xrange(0,5)
         self.pitch = 0
             

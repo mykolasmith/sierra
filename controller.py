@@ -28,7 +28,8 @@ class MidiController(object):
         for note in notes:
             self.triggers[channel][note] = {
                 'animation' : animation,
-                'strips'    : strips
+                'strips'    : strips,
+                'notes'     : notes
             }
         
     def set_channel(self, channel):
@@ -37,16 +38,17 @@ class MidiController(object):
     def note_on(self, msg):
         if msg.note in self.triggers[msg.channel]:
             mapping = self.triggers.get(msg.channel).get(msg.note)
-            self.handler.note_on.put({
+            self.handler.on.put({
                 'strips' : mapping.get('strips'),
                 'animation' : mapping.get('animation'),
+                'notes' : mapping.get('notes'),
                 'msg' : msg,
             })
     
     def note_off(self, msg):
         if msg.note in self.triggers[msg.channel]:
             mapping = self.triggers.get(msg.channel).get(msg.note)
-            self.handler.note_off.put(msg)
+            self.handler.off.put(msg)
             
     def update_control(self, msg):
         self.controls[msg.channel][msg.control] = msg.value

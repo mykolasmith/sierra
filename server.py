@@ -26,8 +26,8 @@ class Universe(object):
                 controller.listen()
                 
             now = time.time()
-            handler.handle_note_on(now)
-            handler.handle_note_off(now)
+            handler.note_on(now)
+            handler.note_off(now)
             handler.worker(now)
             
             #handler.print_active()
@@ -35,7 +35,7 @@ class Universe(object):
             for strip in strips:
                 strip.aggregate()
                 
-            handler.handle_expire()
+            handler.expire()
             
             for client in clients:
                 if client.connected and now - client.last_push >= FPS:
@@ -68,7 +68,10 @@ class Client(object):
 if __name__ == '__main__':
     
     #strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
-    strips = tuple( Strip(x) for x in [15, 30, 60, 120, 160, 180, 200, 240, 260, 300 ] * 65 )
+    strips1 = tuple( Strip(x) for x in [300] * 48 )
+    strips2 = tuple( Strip(x) for x in [300] * 48 )
+    
+    strips = strips1 + strips2
     
     simulation = Client("localhost:7890", strips)
     #beaglebone = Client("beaglebone.local:7890", strips)
