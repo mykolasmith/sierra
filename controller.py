@@ -1,5 +1,7 @@
 import mido
 
+from handler import Handler
+
 class MidiController(object):
     
     def __init__(self, bus, mappings={}):
@@ -35,18 +37,16 @@ class MidiController(object):
     def note_on(self, msg):
         if msg.note in self.triggers[msg.channel]:
             mapping = self.triggers.get(msg.channel).get(msg.note)
-            for strip in mapping.get('strips'):
-                strip.note_on.put({
-                    'strip' : strip,
-                    'animation' : mapping.get('animation'),
-                    'msg' : msg,
-                })
+            self.handler.note_on.put({
+                'strips' : mapping.get('strips'),
+                'animation' : mapping.get('animation'),
+                'msg' : msg,
+            })
     
     def note_off(self, msg):
         if msg.note in self.triggers[msg.channel]:
             mapping = self.triggers.get(msg.channel).get(msg.note)
-            for strip in mapping.get('strips'):
-                strip.note_off.put(msg)
+            self.handler.note_off.put(msg)
             
     def update_control(self, msg):
         self.controls[msg.channel][msg.control] = msg.value
@@ -60,6 +60,12 @@ class MasterController(object):
     def __init__(self, controllers):
         self.controllers = controllers
         
+    def bind(self, *args):
+        for item in args:
+            for controller in self.controllers.itervalues():
+                if type(item) == Handler:
+                    controller.handler = item
+                
     def via_channel(self, channel):
         for controller in self.itervalues():
             controller.set_channel(channel)

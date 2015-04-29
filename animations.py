@@ -8,8 +8,8 @@ import gevent
 
 class Animation(object):
     
-    def __init__(self, strip, controllers, msg, trigger):
-        self.strip = strip
+    def __init__(self, length, controllers, msg, trigger):
+        self.length = length
         self.controllers = controllers
         self.controllers.via_channel(msg.channel)
         self.msg = msg
@@ -18,7 +18,7 @@ class Animation(object):
         self.running = False
         self.done = False
         
-        self.pixels = np.array([(0,0,0)] * strip.length, dtype=np.uint8)
+        self.pixels = np.array([(0,0,0)] * length, dtype=np.uint8)
         
     def run(self, deltaMs):
         pass
@@ -36,10 +36,10 @@ class Animation(object):
         
     def hsb_to_rgb(self, h, s, v, max=127):
         # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
-        return (np.array(
+        return np.array(
             colorsys.hsv_to_rgb(
                 1.0/max * h, 1.0/max * s, 1.0/max * v
-            )) * 255).astype(np.uint8)
+            )) * 255
             
     def fade_down(self, deltaMs, decay):
         if deltaMs > decay:
@@ -47,6 +47,11 @@ class Animation(object):
         else:
             factor = 1.0 - (deltaMs / decay)
             self.pixels = self.pixels_at_inflection * factor
+            
+class Fidget(Animation):
+    
+    def __init__(self, strip, controllers, msg):
+        super(Fidget, self).__init__(strip, controllers, msg, 'hold')
         
 class Positional(Animation):
     
@@ -57,8 +62,8 @@ class Positional(Animation):
         self.max = 59
         
         self.decay = 1.0
-        self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * strip.length)
-        self.factor = round((5/120.) * self.strip.length)
+        self.pos = int(abs((msg.note - self.min) * (1./(self.min-self.max))) * self.length)
+        self.factor = round((5/120.) * self.length)
 
     def run(self, deltaMs):
         hue = self.controllers.get("mpk49", "F1", 64)
@@ -80,10 +85,10 @@ class Rainbow(Animation):
     def run(self, deltaMs):
         x = self.controllers.get("mpk49", "F1", 127)
         speed = self.normalize(x, 0, 127, -0.2, -8.9)
-        for i in range(self.strip.length):
+        for i in xrange(0, self.length):
             r=math.sin(i * .2+ deltaMs * speed ) * 127 + 128
             g=math.sin(i * .2+ deltaMs * speed + 2 ) * 127 + 128
-            b=math.sin(i * .2+ deltaMs * speed + 4 ) * 127 + 128;
+            b=math.sin(i * .2+ deltaMs * speed + 4 ) * 127 + 128
             self.pixels[i] = [r,g,b]
         
     def off(self, deltaMs):
@@ -99,8 +104,8 @@ class MotionTween(Animation):
         if self.pitch != 0:
             self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
         
-        self.num_frames = self.strip.length + len(self.trail)
-        self.duration = 5.0
+        self.num_frames = self.length + len(self.trail)
+        self.duration = 2.0
         
         self.refresh_enabled = self.controllers.get("mpk49", "F2", 0)
         self.djm_enabled = self.controllers.get("mpk49", "F3", 0)

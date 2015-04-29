@@ -3,6 +3,7 @@ import opc
 import numpy as np
 
 from strip import Strip
+from handler import Handler
 from consts import MPK49_MAPPINGS
 from controller import MasterController, MidiController
 
@@ -10,44 +11,44 @@ from animations import MotionTween, Positional, Rainbow
 
 # Per LEDscape spec, all strips must be of equal length
 NUM_PIXELS = 300
+FPS = 1/60.
 
 class Universe(object):
 
-    def __init__(self, clients, controllers):
+    def __init__(self, clients, strips, controllers):
         print 'Starting Universe...'
-        self.clients = clients
-        self.controllers = controllers
         
-        for client in self.clients:
-            for strip in client.strips:
-                strip.bind(self.controllers)
+        handler = Handler(strips, controllers)
+        controllers.bind(handler)
         
         while True:
-            for controller in self.controllers.itervalues():
+            for controller in controllers.itervalues():
                 controller.listen()
-            
-            now = time.time()
-            for client in self.clients:
                 
-                for strip in client.strips:
-                    strip.handle_note_on(now)
-                    strip.handle_note_off(now)
-                    strip.worker(now)
+            now = time.time()
+            handler.handle_note_on(now)
+            handler.handle_note_off(now)
+            handler.worker(now)
             
-                for strip in client.strips:
-                    strip.aggregate()
-                    strip.handle_expire()
-                    
-                if now - client.last_push >= 1/60.0:
-                    pixels = np.concatenate([
-                        strip.pixels[:NUM_PIXELS].astype(np.uint8)
-                        if len(strip.pixels) >= NUM_PIXELS
-                        else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
-                        for strip in client.strips
-                    ])[:21845]
-                    
-                    client.bus.put_pixels(pixels)
-                    client.last_push = now
+            #handler.print_active()
+            
+            for strip in strips:
+                strip.aggregate()
+                
+            handler.handle_expire()
+            
+            for client in clients:
+                if client.connected and now - client.last_push >= FPS:
+                        client.bus.put_pixels(
+                            np.concatenate([
+                                strip.pixels[:NUM_PIXELS].astype(np.uint8)
+                                if len(strip.pixels) >= NUM_PIXELS
+                                else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
+                                for strip in client.strips
+                            ])[:21845]
+                        )
+                        
+                        client.last_push = now
         
 class Client(object):
     
@@ -59,31 +60,29 @@ class Client(object):
         
         if self.bus.can_connect():
             print 'Connected to client: {0}'.format(location)
+            self.connected = True
         else:
             print 'Not connected to client: {0}'.format(location)
+            self.connected = False
         
 if __name__ == '__main__':
     
-    strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
+    #strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
+    strips = tuple( Strip(x) for x in [15, 30, 60, 120, 160, 180, 200, 240, 260, 300 ] * 65 )
     
-    #simulation = Client("localhost:7890", strips, local=True)
-    beaglebone = Client("beaglebone.local:7890", strips)
+    simulation = Client("localhost:7890", strips)
+    #beaglebone = Client("beaglebone.local:7890", strips)
     
     clients = (
-        #simulation,
-        beaglebone,
+        simulation,
+        #beaglebone,
     )
     
     total_pixels = 0
-    for client in clients:
-        if not client.local:
-            for strip in client.strips:
-                total_pixels += strip.length
-            
-    total_strips = 0
-    for client in clients:
-        if not client.local:
-            total_strips += len(client.strips)
+    for strip in strips:
+        total_pixels += strip.length
+        
+    total_strips = len(strips)
             
     print 'Total strips in universe: {0}'.format(total_strips)
     print 'Total pixels in universe: {0}'.format(total_pixels)
@@ -117,4 +116,4 @@ if __name__ == '__main__':
         'nexus' : nexus
     })
     
-    universe = Universe(clients, controllers)
+    universe = Universe(clients, strips, controllers)
