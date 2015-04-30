@@ -44,41 +44,36 @@ class Handler(object):
                             anim.run = anim.off
                             break
                         else:
-                            self.active.pop(anim.msg.note)
-                            [
-                                strip.active.pop(anim.msg.note)
-                                for strip in task['strips']
-                                if strip.length == anim.length
-                            ]
+                            self.end_animation(anim.msg.note, anim, task['strips'])
                     
             lengths = set( strip.length for strip in task['strips'])
-            
             for length in lengths:
                 anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
-                if anim.trigger == 'toggle':
+                if anim.trigger == 'oneshot':
+                    self.begin_animation(id(anim), anim, length, task['strips'])
+                elif anim.trigger == 'hold':
+                    self.begin_animation(anim.msg.note, anim, length, task['strips'])
+                elif anim.trigger == 'toggle':
                     if anim.msg.note in self.active:
                         break
                     else:
-                        self.active.update({ anim.msg.note : {length : anim} })
-                        [
-                            strip.active.update({ anim.msg.note : anim})
-                            for strip in task['strips']
-                            if strip.length == anim.length
-                        ]
-                elif anim.trigger == 'oneshot':
-                    self.active.update({ id(anim) : {length: anim } })
-                    [
-                        strip.active.update({ id(anim) : anim})
-                        for strip in task['strips']
-                        if strip.length == anim.length
-                    ]
-                elif anim.trigger == 'hold':
-                    self.active.update({ anim.msg.note : {length : anim} })
-                    [
-                        strip.active.update({ anim.msg.note : anim})
-                        for strip in task['strips']
-                        if strip.length == anim.length
-                    ]
+                        self.begin_animation(anim.msg.note, anim, length, task['strips'])
+                    
+    def begin_animation(self, identifier, anim, length, strips):
+        self.active.update({ identifier : {length : anim} })
+        [
+            strip.active.update({ identifier : anim})
+            for strip in strips
+            if strip.length == anim.length
+        ]
+        
+    def end_animation(self, identifier, anim, strips):
+        self.active.pop(identifier)
+        [
+            strip.active.pop(identifier)
+            for strip in strips
+            if strip.length == anim.length
+        ]
             
     def note_off(self, now):
         while not self.off.empty():
@@ -100,14 +95,6 @@ class Handler(object):
         while not self.expiry.empty():
             expire = self.expiry.get()
             if expire.msg.note in self.active:
-                group = self.active.pop(expire.msg.note)
-                for anim in group.itervalues():
-                    for strip in self.strips:
-                        if anim.length == strip.length:
-                            strip.active.pop(expire.msg.note)
+                self.end_animation(expire.msg.note, expire, self.strips)
             elif id(expire) in self.active:
-                group = self.active.pop(id(expire))
-                for anim in group.itervalues():
-                    for strip in self.strips:
-                        if anim.length == strip.length:
-                            strip.active.pop(id(expire))
+                self.end_animation(id(expire), expire, self.strips)
