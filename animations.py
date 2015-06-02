@@ -1,10 +1,7 @@
 import numpy as np
-
-import time
-import math
 import colorsys
-
-import gevent
+import noise
+import math
 
 class Animation(object):
     
@@ -27,7 +24,7 @@ class Animation(object):
         pass
         
     def off(self, deltaMs):
-        pass
+        self.pixels[...] = 0
         
     def normalize(self, val, prev_min, prev_max, new_min, new_max):
         if val == prev_min:
@@ -47,19 +44,50 @@ class Animation(object):
     def fade_down(self, deltaMs, decay):
         if deltaMs > decay:
             self.done = True
+            self.pixels[...] = 0
         else:
             factor = 1.0 - (deltaMs / decay)
             self.pixels = self.pixels_at_inflection * factor
             
-class Fidget(Animation):
+class Perlin(Animation):
     
-    def __init__(self, strip, controllers, msg, notes):
-        super(Fidget, self).__init__(strip, controllers, msg, notes, 'hold')
+    def __init__(self, length, controllers, msg, notes):
+        super(Perlin, self).__init__(length, controllers, msg, notes, 'toggle')
+        self.z = 0
+        
+        # Distance between blocks? 0.75 = very narrow, 0.01 = very wide
+        self.scale = 0.05
+
+        self.octave = 1
+        self.mmax = 0.0001
+        self.mmin = 0.0001
+        self.decay = 0.25
+        
+    def run(self, deltaMs):
+        
+        for x in range(self.length):
+            c = noise.pnoise3(x * self.scale, self.scale, self.z * self.scale, self.octave)
+
+            if c > self.mmax: self.mmax = c
+            if c < self.mmin: self.mmin = c
+    
+            c = c + math.fabs(self.mmin)
+            c = c / (self.mmax + math.fabs(self.mmin))
+            
+            #TODO: What does 0.2 coefficient do?
+            c = (c + 0.2) % 1
+            self.pixels[x] = self.hsb_to_rgb(c,1,1,max=1)
+         
+        # Speed of the animation
+        self.z += 0.1
+        
+    def off(self, deltaMs):
+        self.fade_down(deltaMs, self.decay)
         
 class Positional(Animation):
     
-    def __init__(self, strip, controllers, msg, notes):
-        super(Positional, self).__init__(strip, controllers, msg, notes, 'hold')
+    def __init__(self, length, controllers, msg, notes):
+        super(Positional, self).__init__(length, controllers, msg, notes, 'hold')
         
         self.min = min(notes)
         self.max = max(notes)
@@ -78,34 +106,16 @@ class Positional(Animation):
         
     def off(self, deltaMs):
         self.fade_down(deltaMs, self.decay)
-        
-class Rainbow(Animation):
-    
-    def __init__(self, length, controllers, msg, notes):
-        super(Rainbow, self).__init__(length, controllers, msg, notes, 'toggle')
-        self.decay = 1.0
-    
-    def run(self, deltaMs):
-        x = self.controllers.get("mpk49", "F1", 127)
-        speed = self.normalize(x, 0, 127, -0.2, -8.9)
-        for i in xrange(0, self.length):
-            r=math.sin(i * .2+ deltaMs * speed ) * 127 + 128
-            g=math.sin(i * .2+ deltaMs * speed + 2 ) * 127 + 128
-            b=math.sin(i * .2+ deltaMs * speed + 4 ) * 127 + 128
-            self.pixels[i] = [r,g,b]
-        
-    def off(self, deltaMs):
-        self.fade_down(deltaMs, self.decay)
 
 class MotionTween(Animation):
     
-    def __init__(self, strip, controllers, msg, notes):
-        super(MotionTween, self).__init__(strip, controllers, msg, notes, 'oneshot')
+    def __init__(self, length, controllers, msg, notes):
+        super(MotionTween, self).__init__(length, controllers, msg, notes, 'oneshot')
         self.trail = xrange(0,5)
-        self.pitch = 0
-            
-        if self.pitch != 0:
-            self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
+        #self.pitch = 0
+        
+        #if self.pitch != 0:
+        #    self.trail = xrange(0, int((abs(self.pitch) / 409.6)))
         
         self.num_frames = self.length + len(self.trail)
         self.duration = 2.0
@@ -130,17 +140,13 @@ class MotionTween(Animation):
             self.refresh_params()
         
         if self.djm_enabled:
-            color = self.controllers.get('color', 64)
+            self.saturatiion = self.controllers.get('color', 64)
         
         rgb = self.hsb_to_rgb(self.hue,self.saturation,self.brightness)
         for offset in reversed(self.trail):
             factor = 1 - (float(offset) / len(self.trail))
             try:
-                if self.pitch >= 0 and frame - offset > 0:
-                    self.pixels[frame-offset] = rgb * factor
-                    self.pixels[frame - len(self.trail)] = [0,0,0]
-                if self.pitch < 0 and offset - i < 0:
-                    self.pixels[offset-frame] = rgb * factor
-                    self.pixels[-frame + len(self.trail)] = [0,0,0]
+                self.pixels[frame-offset] = rgb * factor
+                self.pixels[frame - len(self.trail)] = [0,0,0]     
             except IndexError:
                 pass

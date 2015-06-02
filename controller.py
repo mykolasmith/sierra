@@ -47,7 +47,6 @@ class MidiController(object):
     
     def note_off(self, msg):
         if msg.note in self.triggers[msg.channel]:
-            mapping = self.triggers.get(msg.channel).get(msg.note)
             self.handler.off.put(msg)
             
     def update_control(self, msg):

@@ -24,3 +24,5 @@ MPK49_MAPPINGS = {
     'S7' : 27,
     'S8' : 28,
 }
+
+NEXUS_MAPPINGS = {}

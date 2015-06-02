@@ -4,13 +4,13 @@ import numpy as np
 
 from strip import Strip
 from handler import Handler
-from consts import MPK49_MAPPINGS
+from consts import MPK49_MAPPINGS, NEXUS_MAPPINGS
 from controller import MasterController, MidiController
 
-from animations import MotionTween, Positional, Rainbow
+from animations import MotionTween, Positional, Perlin
 
 NUM_PIXELS = 300
-FPS = 1/120.
+FPS = 1/60.
 
 class Universe(object):
 
@@ -64,7 +64,11 @@ class Client(object):
         
 if __name__ == '__main__':
     
-    strips = tuple( Strip(x) for x in [NUM_PIXELS] * 1000 )
+    strips = ( Strip(300), Strip(300), Strip(300) )
+    
+    center = strips[0]
+    left = strips[1]
+    right = strips[2]
     
     simulation = Client("localhost:7890", strips)
     #beaglebone = Client("beaglebone.local:7890", strips)
@@ -84,32 +88,32 @@ if __name__ == '__main__':
     print 'Total pixels in universe: {0}'.format(total_pixels)
     
     mpk49 = MidiController("IAC Driver Bus 1", MPK49_MAPPINGS)
-    nexus = MidiController("IAC Driver Bus 2")
+    #nexus = MidiController("IAC Driver Bus 2", NEXUS_MAPPINGS)
     
     mpk49.add_trigger(
         notes=[60],
         channel=1,
         animation=MotionTween,
-        strips=strips
+        strips=strips,
     )
     
     mpk49.add_trigger(
         notes=xrange(36,59),
         channel=1,
         animation=Positional,
-        strips=strips
+        strips=strips,
     )
     
     mpk49.add_trigger(
-        notes=[62],
+        notes=[64],
         channel=1,
-        animation=Rainbow,
-        strips=strips
+        animation=Perlin,
+        strips=strips,
     )
    
     controllers = MasterController({
         'mpk49' : mpk49,
-        'nexus' : nexus
+        #'nexus' : nexus
     })
     
     universe = Universe(clients, strips, controllers)

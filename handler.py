@@ -12,9 +12,6 @@ class Handler(object):
         
         self.active = {}
         
-    def print_active(self):
-        print self.active
-        
     def worker(self, now):
         for group in self.active.itervalues():
             for anim in group.itervalues():
