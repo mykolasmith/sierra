@@ -131,6 +131,8 @@ class MotionTween(Animation):
         self.brightness = 127
         
     def run(self, deltaMs):
+        print self.controllers.get("ipad", "xy1", None)
+        
         frame = round(self.num_frames * (deltaMs / self.duration))
         if frame >= self.num_frames:
             self.done = True

@@ -1,4 +1,5 @@
 import mido
+from OSC import OSCServer
 
 from handler import Handler
 
@@ -16,7 +17,9 @@ class MidiController(object):
             self.dispatch(msg)
             
     def dispatch(self, msg):
-        msg.channel += 1 # Ableton indexes from 1
+        if msg.channel < 15:
+            msg.channel += 1 # Ableton indexes from 1
+        
         if msg.type == 'note_on':
             self.note_on(msg)
         elif msg.type == 'note_off':
@@ -52,9 +55,34 @@ class MidiController(object):
     def update_control(self, msg):
         self.controls[msg.channel][msg.control] = msg.value
         
-    def get(self, param_name, default):
-        param = self.mappings.get(param_name)
+    def get(self, param, default):
+        param = self.mappings.get(param)
         return self.controls.get(self.channel).get(param, default)
+        
+class OSCController(object):
+    
+    def __init__(self, client_address, port, mappings={}):
+        print 'Connecting to OSC server at: %s:%s' % (client_address, port)
+        self.server = OSCServer((client_address, port))
+        self.server.timeout = 0
+        self.controls = dict( (channel, {}) for channel in xrange(1,17) )
+        
+    def get(self, param, default):
+        return self.controls[self.channel].get(param, default)
+        
+    def listen(self):
+        self.server.noCallback_handler = self.dispatch
+        self.server.handle_request()
+        
+    def set_channel(self, channel):
+        self.channel = channel
+        
+    def dispatch(self, pattern, tags, data, addr):
+        pattern = pattern.split('/')
+        channel = int(pattern[1])
+        control = pattern[2]
+        self.controls[channel][control] = data
+        #print "Not implemented:", pattern, data
         
 class MasterController(object):
     

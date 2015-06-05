@@ -5,7 +5,7 @@ import numpy as np
 from strip import Strip
 from handler import Handler
 from consts import MPK49_MAPPINGS, NEXUS_MAPPINGS
-from controller import MasterController, MidiController
+from controller import MasterController, MidiController, OSCController
 
 from animations import MotionTween, Positional, Perlin
 
@@ -37,14 +37,13 @@ class Universe(object):
            
             for client in clients:
                 if client.connected:
-                    client.bus.put_pixels(
-                        np.concatenate([
-                            strip.pixels[:NUM_PIXELS].astype(np.uint8)
-                            if len(strip.pixels) >= NUM_PIXELS
-                            else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
-                            for strip in client.strips
-                        ])[:21845]
-                    )
+                    pixels = np.concatenate([
+                        strip.pixels[:NUM_PIXELS].astype(np.uint8)
+                        if len(strip.pixels) >= NUM_PIXELS
+                        else np.concatenate([ strip.pixels, np.zeros((NUM_PIXELS - strip.length, 3)) ]).astype(np.uint8)
+                        for strip in client.strips
+                    ])
+                    client.bus.put_pixels(pixels)
             
             time.sleep(FPS)
         
@@ -64,11 +63,10 @@ class Client(object):
         
 if __name__ == '__main__':
     
-    strips = ( Strip(300), Strip(300), Strip(300) )
+    hammock1 = [ Strip(300), Strip(300), Strip(300) ]
+    hammock2 = [ Strip(300), Strip(300), Strip(300) ]
     
-    center = strips[0]
-    left = strips[1]
-    right = strips[2]
+    strips = hammock1 + hammock2
     
     simulation = Client("localhost:7890", strips)
     #beaglebone = Client("beaglebone.local:7890", strips)
@@ -88,17 +86,27 @@ if __name__ == '__main__':
     print 'Total pixels in universe: {0}'.format(total_pixels)
     
     mpk49 = MidiController("IAC Driver Bus 1", MPK49_MAPPINGS)
+    osc = OSCController("192.168.1.156", 7000)
     #nexus = MidiController("IAC Driver Bus 2", NEXUS_MAPPINGS)
     
     mpk49.add_trigger(
         notes=[60],
         channel=1,
         animation=MotionTween,
-        strips=strips,
-    )
+        strips=[
+            hammock1[0]
+        ])
+        
+    mpk49.add_trigger(
+        notes=[62],
+        channel=1,
+        animation=MotionTween,
+        strips=[
+            hammock2[0]
+        ])
     
     mpk49.add_trigger(
-        notes=xrange(36,59),
+        notes=xrange(36,50),
         channel=1,
         animation=Positional,
         strips=strips,
@@ -113,6 +121,7 @@ if __name__ == '__main__':
    
     controllers = MasterController({
         'mpk49' : mpk49,
+        'ipad' : osc
         #'nexus' : nexus
     })
     
