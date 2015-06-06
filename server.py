@@ -63,10 +63,11 @@ class Client(object):
         
 if __name__ == '__main__':
     
-    hammock1 = [ Strip(300), Strip(300), Strip(300) ]
-    hammock2 = [ Strip(300), Strip(300), Strip(300) ]
+    #hammock1 = [ Strip(300), Strip(300), Strip(300) ]
+    #hammock2 = [ Strip(300), Strip(300), Strip(300) ]    
+    #strips = hammock1 + hammock2
     
-    strips = hammock1 + hammock2
+    strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
     
     simulation = Client("localhost:7890", strips)
     #beaglebone = Client("beaglebone.local:7890", strips)
@@ -89,31 +90,44 @@ if __name__ == '__main__':
     osc = OSCController("192.168.1.156", 7000)
     #nexus = MidiController("IAC Driver Bus 2", NEXUS_MAPPINGS)
     
-    mpk49.add_trigger(
-        notes=[60],
+    
+    # /multipush1/:col/:row
+    
+    osc.add_trigger(
+        '/multipush1/16/1',
         channel=1,
-        animation=MotionTween,
-        strips=[
-            hammock1[0]
-        ])
-        
-    mpk49.add_trigger(
-        notes=[62],
+        animation=Positional,
+        strips=[strips[0]]
+    )
+    
+    osc.add_trigger(
+        '/multipush2/16/1',
         channel=1,
-        animation=MotionTween,
-        strips=[
-            hammock2[0]
-        ])
+        animation=Positional,
+        strips=[strips[47]]
+    )
     
     mpk49.add_trigger(
-        notes=xrange(36,50),
+        [60],
+        channel=1,
+        animation=MotionTween,
+        strips=strips)
+        
+    mpk49.add_trigger(
+        [62],
+        channel=1,
+        animation=MotionTween,
+        strips=strips)
+    
+    mpk49.add_trigger(
+        xrange(36,50),
         channel=1,
         animation=Positional,
         strips=strips,
     )
     
     mpk49.add_trigger(
-        notes=[64],
+        [64],
         channel=1,
         animation=Perlin,
         strips=strips,

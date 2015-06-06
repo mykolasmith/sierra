@@ -9,8 +9,6 @@ class Animation(object):
         self.length = length
         
         self.controllers = controllers
-        self.controllers.via_channel(msg.channel)
-        
         self.msg = msg
         self.notes = notes
         self.trigger = trigger
@@ -97,9 +95,9 @@ class Positional(Animation):
         self.factor = round((1.0 / (self.max - self.min)) * self.length)
 
     def run(self, deltaMs):
-        hue = self.controllers.get("mpk49", "F1", 64)
-        saturation = self.controllers.get("nexus", "color", 127)
-        brightness = self.controllers.get("mpk49", "master", 127)
+        hue = self.controllers.get(self.msg.channel, "mpk49", "F1", 64)
+        saturation = self.controllers.get(self.msg.channel, "nexus", "color", 127)
+        brightness = self.controllers.get(self.msg.channel, "mpk49", "master", 127)
         
         rgb = self.hsb_to_rgb(hue, saturation, brightness)
         self.pixels[self.pos:self.pos+int(self.factor)] = rgb
@@ -120,19 +118,19 @@ class MotionTween(Animation):
         self.num_frames = self.length + len(self.trail)
         self.duration = 2.0
         
-        self.refresh_enabled = self.controllers.get("mpk49", "F2", 0)
-        self.djm_enabled = self.controllers.get("mpk49", "F3", 0)
+        self.refresh_enabled = self.controllers.get(self.msg.channel, "mpk49", "F2", 0)
+        self.djm_enabled = self.controllers.get(self.msg.channel, "mpk49", "F3", 0)
         
         self.refresh_params()
         
     def refresh_params(self):
-        self.hue = self.controllers.get("mpk49", "F1", 64)
+        #self.hue = self.controllers.get(self.msg.channel, "mpk49", "F1", 64)
+        self.hue = self.controllers.get(self.msg.channel, 'ipad', 'multifader3/1', 1)
+        self.hue = self.normalize(self.hue, 0, 1, 0, 127)
         self.saturation = 127
         self.brightness = 127
         
     def run(self, deltaMs):
-        print self.controllers.get("ipad", "xy1", None)
-        
         frame = round(self.num_frames * (deltaMs / self.duration))
         if frame >= self.num_frames:
             self.done = True
@@ -142,7 +140,7 @@ class MotionTween(Animation):
             self.refresh_params()
         
         if self.djm_enabled:
-            self.saturatiion = self.controllers.get('color', 64)
+            self.saturatiion = self.controllers.get(self.msg.channel, 'nexus', 'color', 64)
         
         rgb = self.hsb_to_rgb(self.hue,self.saturation,self.brightness)
         for offset in reversed(self.trail):

@@ -7,13 +7,7 @@ server = OSCServer( ("192.168.1.156", 7000) )
 def callback(path, tags, args, source):
     # which user will be determined by path:
     # we just throw away all slashes and join together what's left
-    #print path # /ping
-    #print tags # none?
-    print path
-    print args # []
-
-#server.addMsgHandler( "/", callback )
-#server.addMsgHandler( "/1/multitoggle1/1/1", callback )
+    print path, tags, args, source
 
 # user script that's called by the game engine every frame
 def each_frame():
