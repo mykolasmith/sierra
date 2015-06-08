@@ -2,7 +2,7 @@ from OSC import OSCServer
 import sys
 from time import sleep
 
-server = OSCServer( ("192.168.1.156", 7000) )
+server = OSCServer( ("10.0.9.177", 7000) )
 
 def callback(path, tags, args, source):
     # which user will be determined by path:

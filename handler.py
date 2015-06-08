@@ -1,4 +1,5 @@
 from gevent.queue import Queue
+from message import OSCMetaMessage
 
 class Handler(object):
     
@@ -30,7 +31,10 @@ class Handler(object):
     def note_on(self, now):
         while not self.on.empty():
             task = self.on.get()
-            current = self.active.get(task['msg'].note)
+            if isinstance(task['msg'], OSCMetaMessage):
+                current = self.active.get(task['msg'].pattern)
+            else:
+                current = self.active.get(task['msg'].note)
             
             if current:
                 for anim in current.itervalues():
@@ -41,7 +45,10 @@ class Handler(object):
                             anim.run = anim.off
                             break
                         else:
-                            self.end_animation(anim.msg.note, anim, task['strips'])
+                            if isinstance(task['msg'], OSCMetaMessage):
+                                self.end_animation(anim.msg.pattern, anim, task['strips'])
+                            else:
+                                self.end_animation(anim.msg.note, anim, task['strips'])
                  
             lengths = set( strip.length for strip in task['strips'])
         
@@ -50,12 +57,18 @@ class Handler(object):
                 if anim.trigger == 'oneshot':
                     self.begin_animation(id(anim), anim, length, task['strips'])
                 elif anim.trigger == 'hold':
-                    self.begin_animation(anim.msg.note, anim, length, task['strips'])
+                    if isinstance(task['msg'], OSCMetaMessage):
+                        self.begin_animation(anim.msg.pattern, anim, length, task['strips'])
+                    else:
+                        self.begin_animation(anim.msg.note, anim, length, task['strips'])
                 elif anim.trigger == 'toggle':
                     if anim.msg.note in self.active:
                         break
                     else:
-                        self.begin_animation(anim.msg.note, anim, length, task['strips'])
+                        if isinstance(task['msg'], OSCMetaMessage):
+                            self.begin_animation(anim.msg.pattern, anim, length, task['strips'])
+                        else:
+                            self.begin_animation(anim.msg.note, anim, length, task['strips'])
                 
     def begin_animation(self, identifier, anim, length, strips):
         for strip in strips:
@@ -75,7 +88,12 @@ class Handler(object):
     def note_off(self, now):
         while not self.off.empty():
             msg = self.off.get()
-            current = self.active.get(msg.note)
+            
+            if isinstance(msg, OSCMetaMessage):
+                current = self.active.get(msg.pattern)
+            else:
+                current = self.active.get(msg.note)
+                
             if current:
                 for anim in current.itervalues():
                     
@@ -91,7 +109,13 @@ class Handler(object):
     def expire(self):
         while not self.expiry.empty():
             expire = self.expiry.get()
-            if expire.msg.note in self.active:
-                self.end_animation(expire.msg.note, expire, self.strips)
-            elif id(expire) in self.active:
-                self.end_animation(id(expire), expire, self.strips)
+            if isinstance(expire.msg, OSCMetaMessage):
+                if expire.msg.pattern in self.active:
+                    self.end_animation(expire.msg.pattern, expire, self.strips)
+                elif id(expire) in self.active:
+                    self.end_animation(id(expire), expire, self.strips)
+            else:
+                if expire.msg.note in self.active:
+                    self.end_animation(expire.msg.note, expire, self.strips)
+                elif id(expire) in self.active:
+                    self.end_animation(id(expire), expire, self.strips)

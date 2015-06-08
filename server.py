@@ -7,7 +7,9 @@ from handler import Handler
 from consts import MPK49_MAPPINGS, NEXUS_MAPPINGS
 from controller import MasterController, MidiController, OSCController
 
-from animations import MotionTween, Positional, Perlin
+from animations.motion_tween import MotionTween
+from animations.positional import   Positional
+from animations.perlin import       Perlin
 
 NUM_PIXELS = 300
 FPS = 1/60.
@@ -63,10 +65,6 @@ class Client(object):
         
 if __name__ == '__main__':
     
-    #hammock1 = [ Strip(300), Strip(300), Strip(300) ]
-    #hammock2 = [ Strip(300), Strip(300), Strip(300) ]    
-    #strips = hammock1 + hammock2
-    
     strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
     
     simulation = Client("localhost:7890", strips)
@@ -86,25 +84,16 @@ if __name__ == '__main__':
     print 'Total strips in universe: {0}'.format(total_strips)
     print 'Total pixels in universe: {0}'.format(total_pixels)
     
-    mpk49 = MidiController("IAC Driver Bus 1", MPK49_MAPPINGS)
-    osc = OSCController("192.168.1.156", 7000)
-    #nexus = MidiController("IAC Driver Bus 2", NEXUS_MAPPINGS)
+    mpk49 = MidiController("IAC Driver Bus 1")
+    osc = OSCController("10.0.9.177", 7000)
+    #nexus = MidiController("IAC Driver Bus 2")
     
-    
-    # /multipush1/:col/:row
     
     osc.add_trigger(
-        '/multipush1/16/1',
+        '/multipush1/1/16',
         channel=1,
         animation=Positional,
-        strips=[strips[0]]
-    )
-    
-    osc.add_trigger(
-        '/multipush2/16/1',
-        channel=1,
-        animation=Positional,
-        strips=[strips[47]]
+        strips=strips
     )
     
     mpk49.add_trigger(

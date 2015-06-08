@@ -3,13 +3,31 @@ import re
 
 from OSC import OSCServer
 from handler import Handler
+from message import OSCMetaMessage
+
+class MasterController(object):
+    
+    def __init__(self, controllers):
+        self.controllers = controllers
+        
+    def bind(self, handler):
+        if type(handler) == Handler:
+            for controller in self.controllers.itervalues():
+                controller.handler = handler
+    
+    def get(self, channel, controller_name, param, default):
+        if controller_name in self.controllers:
+            return self.controllers[controller_name].get(channel, param, default)
+        return default
+        
+    def itervalues(self, *args, **kwargs):
+        return self.controllers.itervalues()
 
 class MidiController(object):
     
-    def __init__(self, bus, mappings={}):
+    def __init__(self, bus):
         print 'Connecting to MIDI port: %s' % bus
         self.bus = mido.open_input(bus)
-        self.mappings = mappings
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
         self.triggers = dict( (channel, {}) for channel in xrange(1,17) )
         
@@ -27,6 +45,8 @@ class MidiController(object):
             self.note_off(msg)
         elif msg.type == 'control_change':
             self.update_control(msg)
+        elif msg.type == 'pitchwheel':
+            self.update_pitchwheel(msg)
         
     def add_trigger(self, notes, channel, animation, strips):
         for note in notes:
@@ -50,16 +70,18 @@ class MidiController(object):
         if msg.note in self.triggers[msg.channel]:
             self.handler.off.put(msg)
             
+    def update_pitchwheel(self, msg):
+        self.controls[msg.channel].update({ 'pitchwheel' : msg.pitch })
+            
     def update_control(self, msg):
-        self.controls[msg.channel][msg.control] = msg.value
+        self.controls[msg.channel].update({ msg.control : msg.value })
         
     def get(self, channel, param, default):
-        param = self.mappings.get(param)
         return self.controls.get(channel).get(param, default)
         
 class OSCController(object):
     
-    def __init__(self, client_address, port, mappings={}):
+    def __init__(self, client_address, port):
         print 'Connecting to OSC server at: %s:%s' % (client_address, port)
         self.server = OSCServer((client_address, port))
         self.server.timeout = 0
@@ -74,13 +96,8 @@ class OSCController(object):
         self.server.handle_request()
         
     def add_trigger(self, pattern, channel, animation, strips):
-        
-        #definition = re.search(r"\/([0-9]+)([/])([A-Za-z0-9]+)", p)
-        
         expr = pattern.split('/')[1:]
         component = expr.pop(0)
-        
-        # (row * num_col) + col
         
         if len(expr) > 1:
             # multi-dimensional, e.g. '/multipush1/2/5'
@@ -90,7 +107,6 @@ class OSCController(object):
             for col in xrange(1, cols + 1):
                 for row in xrange(1, rows + 1):
                     trigger = template.format(component, col, row)
-                    print trigger
                     self.triggers[channel].update({ trigger : {
                         'animation' : animation,
                         'strips'    : strips,
@@ -115,10 +131,6 @@ class OSCController(object):
             pattern = '/' + '/'.join(expr)
             if pattern in self.triggers[channel]:
                 mapping = self.triggers.get(channel).get(pattern)
-                print pattern
-                
-                print expr
-                print mapping.get('notes')
                 
                 row = int(expr[2]) - 1
                 col = int(expr[1]) - 1
@@ -126,7 +138,7 @@ class OSCController(object):
                 
                 note = ((row * num_cols) + col)
                 if data == 1.0:
-                    msg = mido.Message(type="note_on", note=note, channel=channel)
+                    msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
                     self.handler.on.put({
                         'strips': mapping.get('strips'),
                         'animation': mapping.get('animation'),
@@ -134,24 +146,5 @@ class OSCController(object):
                         'msg': msg
                     })
                 if data == 0.0:
-                    msg = mido.Message(type="note_off", note=note, channel=channel)
+                    msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
                     self.handler.off.put(msg)
-            
-        
-class MasterController(object):
-    
-    def __init__(self, controllers):
-        self.controllers = controllers
-        
-    def bind(self, handler):
-        if type(handler) == Handler:
-            for controller in self.controllers.itervalues():
-                controller.handler = handler
-    
-    def get(self, channel, controller_name, param_name, default):
-        if controller_name in self.controllers:
-            return self.controllers[controller_name].get(channel, param_name, default)
-        return default
-        
-    def itervalues(self, *args, **kwargs):
-        return self.controllers.itervalues()
