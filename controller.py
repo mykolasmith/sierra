@@ -10,6 +10,26 @@ class MasterController(object):
     def __init__(self, controllers):
         self.controllers = controllers
         
+    def parse(self, channel, params):
+        result = dict()
+        for param, conditions in params.iteritems():
+            default = None
+            value = None
+            for condition in conditions:
+                if type(condition) in (int, float):
+                    default = condition
+                else:
+                    controller, accessor = condition
+                    if controller in self.controllers:
+                        value = self.controllers[controller].get(channel, accessor)
+                        if value is not None:
+                            break
+            if value:
+                result.update({ param : value })
+            else:
+                result.update({ param : default })
+        return result
+        
     def bind(self, handler):
         if type(handler) == Handler:
             for controller in self.controllers.itervalues():
@@ -30,6 +50,9 @@ class MidiController(object):
         self.bus = mido.open_input(bus)
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
         self.triggers = dict( (channel, {}) for channel in xrange(1,17) )
+        
+    def normalize(self, val):
+        return val / 127.
         
     def listen(self):
         for msg in self.bus.iter_pending():
@@ -74,10 +97,11 @@ class MidiController(object):
         self.controls[msg.channel].update({ 'pitchwheel' : msg.pitch })
             
     def update_control(self, msg):
-        self.controls[msg.channel].update({ msg.control : msg.value })
+        val = self.normalize(msg.value)
+        self.controls[msg.channel].update({ msg.control : val })
         
-    def get(self, channel, param, default):
-        return self.controls.get(channel).get(param, default)
+    def get(self, channel, param):
+        return self.controls.get(channel).get(param, None)
         
 class OSCController(object):
     
@@ -88,8 +112,8 @@ class OSCController(object):
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
         self.triggers = dict( (channel, {}) for channel in xrange(1,17) )
         
-    def get(self, channel, param, default):
-        return self.controls[channel].get(param, default)
+    def get(self, channel, param):
+        return self.controls[channel].get(param, None)
         
     def listen(self):
         self.server.noCallback_handler = self.dispatch # TODO: Does this need to be here?

@@ -30,13 +30,15 @@ class Animation(object):
             return new_max
         else:
             return (float(val) / (prev_max - prev_min)) * (new_max - new_min)
+            
+    def refresh_params(self):
+        params = self.controllers.parse(self.msg.channel, self.params)
+        for param, val in params.iteritems():
+            setattr(self, param, val)
         
-    def hsb_to_rgb(self, h, s, v, max=127):
+    def hsb_to_rgb(self, h, s, b):
         # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
-        return np.array(
-            colorsys.hsv_to_rgb(
-                1.0/max * h, 1.0/max * s, 1.0/max * v
-            )) * 255
+        return np.array(colorsys.hsv_to_rgb(h, s, b)) * 255
             
     def fade_down(self, deltaMs, decay):
         if deltaMs > decay:

@@ -85,7 +85,7 @@ if __name__ == '__main__':
     print 'Total pixels in universe: {0}'.format(total_pixels)
     
     mpk49 = MidiController("IAC Driver Bus 1")
-    osc = OSCController("10.0.9.177", 7000)
+    osc = OSCController("192.168.1.156", 7000)
     #nexus = MidiController("IAC Driver Bus 2")
     
     

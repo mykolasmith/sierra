@@ -29,7 +29,7 @@ class Perlin(Animation):
             
             #TODO: What does 0.2 coefficient do?
             c = (c + 0.2) % 1
-            self.pixels[x] = self.hsb_to_rgb(c,1,1,max=1)
+            self.pixels[x] = self.hsb_to_rgb(c,1,1)
          
         # Speed of the animation
         self.z += 0.1
