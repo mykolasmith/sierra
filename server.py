@@ -96,6 +96,13 @@ if __name__ == '__main__':
         strips=strips
     )
     
+    osc.add_trigger(
+        '/push1',
+        channel=1,
+        animation=MotionTween,
+        strips=strips
+    )
+    
     mpk49.add_trigger(
         [60],
         channel=1,

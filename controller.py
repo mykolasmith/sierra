@@ -137,7 +137,7 @@ class OSCController(object):
                         'notes'     : [cols, rows]
                     }})
         else:
-            self.triggers[channel].update({ trigger : {
+            self.triggers[channel].update({ component : {
                 'animation': animation,
                 'strips': strips,
                 'notes': [0]
@@ -151,7 +151,7 @@ class OSCController(object):
             data = data.pop()
         
         if len(expr) > 1:
-            # multi-dimensional 
+            # multi-element 
             pattern = '/' + '/'.join(expr)
             if pattern in self.triggers[channel]:
                 mapping = self.triggers.get(channel).get(pattern)
@@ -161,14 +161,28 @@ class OSCController(object):
                 num_cols = mapping.get('notes')[0]
                 
                 note = ((row * num_cols) + col)
+                msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
                 if data == 1.0:
-                    msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
                     self.handler.on.put({
                         'strips': mapping.get('strips'),
                         'animation': mapping.get('animation'),
                         'notes': mapping.get('notes'),
                         'msg': msg
                     })
-                if data == 0.0:
-                    msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
+                elif data == 0.0:
+                    self.handler.off.put(msg)
+        else:
+            # single-element
+            pattern = expr.pop()
+            if pattern in self.triggers[channel]:
+                mapping = self.triggers.get(channel).get(pattern)
+                msg = OSCMetaMessage(note=0, pattern = pattern, channel=channel)
+                if data == 1.0:
+                    self.handler.on.put({
+                        'strips': mapping.get('strips'),
+                        'animation': mapping.get('animation'),
+                        'notes': mapping.get('notes'),
+                        'msg': msg
+                    })
+                elif data == 0.0:
                     self.handler.off.put(msg)
