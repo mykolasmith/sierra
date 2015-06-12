@@ -24,7 +24,7 @@ class MasterController(object):
                         value = self.controllers[controller].get(channel, accessor)
                         if value is not None:
                             break
-            if value:
+            if value is not None:
                 result.update({ param : value })
             else:
                 result.update({ param : default })
@@ -94,7 +94,7 @@ class MidiController(object):
             self.handler.off.put(msg)
             
     def update_pitchwheel(self, msg):
-        self.controls[msg.channel].update({ 'pitchwheel' : msg.pitch })
+        self.controls[msg.channel].update({ 'pitch' : msg.pitch })
             
     def update_control(self, msg):
         val = self.normalize(msg.value)
@@ -160,7 +160,7 @@ class OSCController(object):
                 col = int(expr[1]) - 1
                 num_cols = mapping.get('notes')[0]
                 
-                note = ((row * num_cols) + col)
+                note = ((row * num_cols) + col) + 1
                 msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
                 if data == 1.0:
                     self.handler.on.put({
@@ -174,6 +174,13 @@ class OSCController(object):
         else:
             # single-element
             pattern = expr.pop()
+            
+            if pattern.find('rotary') >= 0 or\
+               pattern.find('fader') >= 0 or\
+               pattern.find('toggle') >= 0:
+                self.controls[channel].update({ pattern : data })
+                return
+                
             if pattern in self.triggers[channel]:
                 mapping = self.triggers.get(channel).get(pattern)
                 msg = OSCMetaMessage(note=0, pattern = pattern, channel=channel)

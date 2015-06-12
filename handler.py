@@ -43,12 +43,12 @@ class Handler(object):
                             anim.t0 = now
                             anim.pixels_at_inflection = anim.pixels
                             anim.run = anim.off
-                            break
                         else:
                             if isinstance(task['msg'], OSCMetaMessage):
                                 self.end_animation(anim.msg.pattern, anim, task['strips'])
                             else:
                                 self.end_animation(anim.msg.note, anim, task['strips'])
+                        return
                  
             lengths = set( strip.length for strip in task['strips'])
         

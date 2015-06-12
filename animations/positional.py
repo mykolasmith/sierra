@@ -11,19 +11,28 @@ class Positional(Animation):
         self.params = {
             'hue': [
                 0.5,
-                ("mpk49", 12)
+                ("ipad", "fader1"),
+                ("mpk49", 4)
             ],
-            'saturation': [
+            'saturation' : [
                 1.0,
-                ("nexus", "color")
+                ("ipad", "fader2"),
+                ("mpk49", 1)
             ],
             'brightness': [
                 1.0,
+                ("ipad", "fader3"),
                 ("mpk49", 14)
+            ],
+            'attack' : [
+                0.1,
+                ("ipad", "rotary1"),
+                ("mpk49", 5)
             ],
             'decay': [
                 1.0,
-                ("mpk49", None)
+                ("ipad", "rotary2"),
+                ("mpk49", 15)
             ]
         }
         
@@ -34,7 +43,10 @@ class Positional(Animation):
         self.refresh_params()
         
         rgb = self.hsb_to_rgb(self.hue, self.saturation, self.brightness)
-        self.pixels[self.pos:self.pos+int(self.factor)] = rgb
+        factor = 1.0
+        if deltaMs < self.attack:
+            factor = deltaMs / self.attack
+        self.pixels[self.pos:self.pos+int(self.factor)] = rgb * factor
         
     def off(self, deltaMs):
-        self.fade_down(deltaMs, self.decay)
+        self.fade_down(deltaMs, self.decay + 0.01)
