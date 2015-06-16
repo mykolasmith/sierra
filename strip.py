@@ -1,14 +1,8 @@
 import numpy as np
-import time
-
-from controller import MasterController
-
-from gevent.queue import Queue
 
 class Strip(object):
     
     def __init__(self, length):
-        # print 'Created strip %s of length %s' % (self, length)
         self.length = length
         
         # Each strip has a master frame that gets aggregated from the active animations' frame

@@ -31,11 +31,13 @@ class Handler(object):
     def note_on(self, now):
         while not self.on.empty():
             task = self.on.get()
-            if isinstance(task['msg'], OSCMetaMessage):
-                current = self.active.get(task['msg'].pattern)
-            else:
-                current = self.active.get(task['msg'].note)
             
+            if isinstance(task['msg'], OSCMetaMessage):
+                identifier = task['msg'].pattern
+            else:
+                identifier = task['msg'].note
+                
+            current = self.active.get(identifier)
             if current:
                 for anim in current.itervalues():
                     if anim.trigger == 'toggle':
@@ -45,30 +47,29 @@ class Handler(object):
                             anim.run = anim.off
                             break
                         else:
-                            if isinstance(task['msg'], OSCMetaMessage):
-                                self.end_animation(anim.msg.pattern, anim, task['strips'])
-                            else:
-                                self.end_animation(anim.msg.note, anim, task['strips'])
+                            self.end_animation(identifier, anim, task['strips'])
                  
             lengths = set( strip.length for strip in task['strips'])
-        
             for length in lengths:
                 anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
-                if anim.trigger == 'oneshot':
-                    self.begin_animation(id(anim), anim, length, task['strips'])
-                elif anim.trigger == 'hold':
-                    if isinstance(task['msg'], OSCMetaMessage):
-                        self.begin_animation(anim.msg.pattern, anim, length, task['strips'])
-                    else:
-                        self.begin_animation(anim.msg.note, anim, length, task['strips'])
-                elif anim.trigger == 'toggle':
-                    if anim.msg.note in self.active:
+                
+                if isinstance(task['msg'], OSCMetaMessage):
+                    identifier = anim.msg.pattern
+                else:
+                    identifier = anim.msg.note
+                    
+                if anim.trigger == 'toggle':
+                    if identifier in self.active:
                         break
                     else:
-                        if isinstance(task['msg'], OSCMetaMessage):
-                            self.begin_animation(anim.msg.pattern, anim, length, task['strips'])
-                        else:
-                            self.begin_animation(anim.msg.note, anim, length, task['strips'])
+                        self.begin_animation(identifier, anim, length, task['strips'])
+                
+                elif anim.trigger == 'hold':
+                    self.begin_animation(identifier, anim, length, task['strips'])
+
+                elif anim.trigger == 'oneshot':
+                    identifier = id(anim)
+                    self.begin_animation(identifier, anim, length, task['strips'])
                 
     def begin_animation(self, identifier, anim, length, strips):
         for strip in strips:
@@ -88,10 +89,11 @@ class Handler(object):
             msg = self.off.get()
             
             if isinstance(msg, OSCMetaMessage):
-                current = self.active.get(msg.pattern)
+                identifier = msg.pattern
             else:
-                current = self.active.get(msg.note)
+                identifier = msg.note
                 
+            current = self.active.get(identifier) 
             if current:
                 for anim in current.itervalues():
                     
@@ -107,13 +109,13 @@ class Handler(object):
     def expire(self):
         while not self.expiry.empty():
             expire = self.expiry.get()
+            
             if isinstance(expire.msg, OSCMetaMessage):
-                if expire.msg.pattern in self.active:
-                    self.end_animation(expire.msg.pattern, expire, self.strips)
-                elif id(expire) in self.active:
-                    self.end_animation(id(expire), expire, self.strips)
+                identifier = expire.msg.pattern
             else:
-                if expire.msg.note in self.active:
-                    self.end_animation(expire.msg.note, expire, self.strips)
-                elif id(expire) in self.active:
-                    self.end_animation(id(expire), expire, self.strips)
+                identifier = expire.msg.note
+                
+            if identifier in self.active:
+                self.end_animation(identifier, expire, self.strips)
+            elif id(expire) in self.active:
+                self.end_animation(id(expire), expire, self.strips)
