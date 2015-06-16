@@ -43,12 +43,12 @@ class Handler(object):
                             anim.t0 = now
                             anim.pixels_at_inflection = anim.pixels
                             anim.run = anim.off
+                            break
                         else:
                             if isinstance(task['msg'], OSCMetaMessage):
                                 self.end_animation(anim.msg.pattern, anim, task['strips'])
                             else:
                                 self.end_animation(anim.msg.note, anim, task['strips'])
-                        return
                  
             lengths = set( strip.length for strip in task['strips'])
         
@@ -74,7 +74,6 @@ class Handler(object):
         for strip in strips:
             if strip.length == anim.length:
                 strip.active.update({ identifier: anim })
-        
         self.active.update({ identifier : {length : anim} })
         
     def end_animation(self, identifier, anim, strips):
@@ -82,7 +81,6 @@ class Handler(object):
             if identifier in strip.active:
                 if strip.length == anim.length:
                     strip.active.pop(identifier)
-        
         self.active.pop(identifier)
 
     def note_off(self, now):

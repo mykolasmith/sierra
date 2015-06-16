@@ -124,4 +124,110 @@
         [84],
         channel=1,
         animation=ClearOSC,
-        strips=strips[0])
+        strips=[strips[0]])
+    
+    # touchOSC
+    
+    osc.add_trigger(
+        '/multipush1/1/16',
+        channel=1,
+        animation=Positional,
+        strips=ALL_GOALS
+    )
+    
+    osc.add_trigger(
+        '/multipush2/16/1',
+        channel=1,
+        animation=Positional,
+        strips=GOAL1 + GOAL2)
+    
+    osc.add_trigger(
+        '/multipush3/16/1',
+        channel=1,
+        animation=Positional,
+        strips=GOAL3 + GOAL4)
+
+    osc.add_trigger(
+        '/push1',
+        channel=1,
+        animation=ClearOSC,
+        strips=[strips[0]])
+        
+    osc.add_trigger(
+        '/multipush3/1/16',
+        channel=1,
+        animation=Positional,
+        strips=GOAL3 + GOAL4)
+        
+    osc.add_trigger(
+        '/push1',
+        channel=2,
+        animation=MotionTween,
+        strips=GOAL1)
+        
+    osc.add_trigger(
+        '/push2',
+        channel=2,
+        animation=BackwardMotionTween,
+        strips=GOAL1)
+        
+    osc.add_trigger(
+        '/push3',
+        channel=2,
+        animation=MotionTween,
+        strips=GOAL2)
+        
+    osc.add_trigger(
+        '/push4',
+        channel=2,
+        animation=BackwardMotionTween,
+        strips=GOAL2)
+    
+    osc.add_trigger(
+        '/push5',
+        channel=2,
+        animation=MotionTween,
+        strips=GOAL3)
+        
+    osc.add_trigger(
+        '/push6',
+        channel=2,
+        animation=BackwardMotionTween,
+        strips=GOAL3)
+        
+    osc.add_trigger(
+        '/push7',
+        channel=2,
+        animation=MotionTween,
+        strips=GOAL4)
+        
+    osc.add_trigger(
+        '/push8',
+        channel=2,
+        animation=BackwardMotionTween,
+        strips=GOAL4)
+        
+    osc.add_trigger(
+        "/push10",
+        channel=2,
+        animation=Perlin,
+        strips=ALL_GOALS
+    )
+    
+    osc.add_trigger(
+        '/push9',
+        channel=2,
+        animation=ClearOSC,
+        strips=[strips[0]])
+        
+    osc.add_trigger(
+        '/push11',
+        channel=2,
+        animation=MotionTween,
+        strips=ALL_GOALS)
+        
+    osc.add_trigger(
+        '/push12',
+        channel=2,
+        animation=BackwardMotionTween,
+        strips=ALL_GOALS)

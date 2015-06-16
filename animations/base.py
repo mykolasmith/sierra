@@ -32,7 +32,7 @@ class Animation(object):
             return (float(val) / (prev_max - prev_min)) * (new_max - new_min)
             
     def refresh_params(self):
-        params = self.controllers.parse(self.msg.channel, self.params)
+        params = self.controllers.parse_params(self.msg.channel, self.params)
         for param, val in params.iteritems():
             setattr(self, param, val)
         
@@ -47,6 +47,3 @@ class Animation(object):
         else:
             factor = 1.0 - (deltaMs / decay)
             self.pixels = self.pixels_at_inflection * factor
-            
-
-        

@@ -1,8 +1,11 @@
-from OSC import OSCServer
 import sys
+import socket
 from time import sleep
 
-server = OSCServer( ("169.254.87.176", 7000) )
+from OSC import OSCServer
+
+ip = socket.gethostbyname(socket.gethostname())
+server = OSCServer( (ip, 7000) )
 
 def callback(path, tags, args, source):
     # which user will be determined by path:

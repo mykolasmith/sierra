@@ -10,7 +10,10 @@ class MasterController(object):
     def __init__(self, controllers):
         self.controllers = controllers
         
-    def parse(self, channel, params):
+    def __getitem__(self, item):
+        return self.controllers[item]
+        
+    def parse_params(self, channel, params):
         result = dict()
         for param, conditions in params.iteritems():
             default = None
@@ -116,7 +119,7 @@ class OSCController(object):
         return self.controls[channel].get(param, None)
         
     def listen(self):
-        self.server.noCallback_handler = self.dispatch # TODO: Does this need to be here?
+        self.server.noCallback_handler = self.dispatch
         self.server.handle_request()
         
     def add_trigger(self, pattern, channel, animation, strips):
@@ -134,14 +137,27 @@ class OSCController(object):
                     self.triggers[channel].update({ trigger : {
                         'animation' : animation,
                         'strips'    : strips,
-                        'notes'     : [cols, rows]
+                        'notes'     : {'cols' : cols, 'rows': rows}
                     }})
         else:
+            # one-dimensions, e.g. '/push1'
             self.triggers[channel].update({ component : {
                 'animation': animation,
                 'strips': strips,
                 'notes': [0]
             }})
+    
+    def send(self, data, mapping, note, pattern, channel):
+        msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
+        if data == 1.0:
+            self.handler.on.put({
+                'strips': mapping.get('strips'),
+                'animation': mapping.get('animation'),
+                'notes': mapping.get('notes'),
+                'msg': msg
+            })
+        elif data == 0.0:
+            self.handler.off.put(msg)
         
     def dispatch(self, pattern, tags, data, addr):
         expr = pattern.split('/')[1:]
@@ -156,21 +172,12 @@ class OSCController(object):
             if pattern in self.triggers[channel]:
                 mapping = self.triggers.get(channel).get(pattern)
                 
-                row = int(expr[2]) - 1
-                col = int(expr[1]) - 1
-                num_cols = mapping.get('notes')[0]
-                
+                row = int(expr.pop()) - 1
+                col = int(expr.pop()) - 1
+                num_cols = mapping.get('notes').get('cols')
                 note = ((row * num_cols) + col) + 1
-                msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
-                if data == 1.0:
-                    self.handler.on.put({
-                        'strips': mapping.get('strips'),
-                        'animation': mapping.get('animation'),
-                        'notes': mapping.get('notes'),
-                        'msg': msg
-                    })
-                elif data == 0.0:
-                    self.handler.off.put(msg)
+                
+                self.send(data, mapping, note, pattern, channel)
         else:
             # single-element
             pattern = expr.pop()
@@ -183,13 +190,5 @@ class OSCController(object):
                 
             if pattern in self.triggers[channel]:
                 mapping = self.triggers.get(channel).get(pattern)
-                msg = OSCMetaMessage(note=0, pattern = pattern, channel=channel)
-                if data == 1.0:
-                    self.handler.on.put({
-                        'strips': mapping.get('strips'),
-                        'animation': mapping.get('animation'),
-                        'notes': mapping.get('notes'),
-                        'msg': msg
-                    })
-                elif data == 0.0:
-                    self.handler.off.put(msg)
+                
+                self.send(data, mapping, note, pattern, channel)
