@@ -3,7 +3,6 @@ import re
 
 from OSC import OSCServer
 from handler import Handler
-from message import OSCMetaMessage
 
 class MasterController(object):
     
@@ -122,73 +121,11 @@ class OSCController(object):
         self.server.noCallback_handler = self.dispatch
         self.server.handle_request()
         
-    def add_trigger(self, pattern, channel, animation, strips):
-        expr = pattern.split('/')[1:]
-        component = expr.pop(0)
-        
-        if len(expr) > 1:
-            # multi-dimensional, e.g. '/multipush1/2/5'
-            cols, rows = expr
-            cols, rows = int(cols), int(rows)
-            template = '/{0}/{1}/{2}'
-            for col in xrange(1, cols + 1):
-                for row in xrange(1, rows + 1):
-                    trigger = template.format(component, col, row)
-                    self.triggers[channel].update({ trigger : {
-                        'animation' : animation,
-                        'strips'    : strips,
-                        'notes'     : {'cols' : cols, 'rows': rows}
-                    }})
-        else:
-            # one-dimensions, e.g. '/push1'
-            self.triggers[channel].update({ component : {
-                'animation': animation,
-                'strips': strips,
-                'notes': [0]
-            }})
-    
-    def send(self, data, mapping, note, pattern, channel):
-        msg = OSCMetaMessage(note=note, pattern=pattern, channel=channel)
-        if data == 1.0:
-            self.handler.on.put({
-                'strips': mapping.get('strips'),
-                'animation': mapping.get('animation'),
-                'notes': mapping.get('notes'),
-                'msg': msg
-            })
-        elif data == 0.0:
-            self.handler.off.put(msg)
-        
     def dispatch(self, pattern, tags, data, addr):
         expr = pattern.split('/')[1:]
-        channel = int( expr.pop(0) )
-        
-        if len(data) == 1:
-            data = data.pop()
-        
-        if len(expr) > 1:
-            # multi-element 
-            pattern = '/' + '/'.join(expr)
-            if pattern in self.triggers[channel]:
-                mapping = self.triggers.get(channel).get(pattern)
-                
-                row = int(expr.pop()) - 1
-                col = int(expr.pop()) - 1
-                num_cols = mapping.get('notes').get('cols')
-                note = ((row * num_cols) + col) + 1
-                
-                self.send(data, mapping, note, pattern, channel)
-        else:
-            # single-element
-            pattern = expr.pop()
+        channel, pattern = expr[0:1]
+        channel = int(channel)
             
-            if pattern.find('rotary') >= 0 or\
-               pattern.find('fader') >= 0 or\
-               pattern.find('toggle') >= 0:
-                self.controls[channel].update({ pattern : data })
-                return
-                
-            if pattern in self.triggers[channel]:
-                mapping = self.triggers.get(channel).get(pattern)
-                
-                self.send(data, mapping, note, pattern, channel)
+        if pattern.find('rotary') >= 0 or\
+           pattern.find('fader') >= 0:
+            self.controls[channel].update({ pattern : data })

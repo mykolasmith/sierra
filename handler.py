@@ -1,5 +1,4 @@
 from gevent.queue import Queue
-from message import OSCMetaMessage
 
 class Handler(object):
     
@@ -31,13 +30,9 @@ class Handler(object):
     def note_on(self, now):
         while not self.on.empty():
             task = self.on.get()
-            
-            if isinstance(task['msg'], OSCMetaMessage):
-                identifier = task['msg'].pattern
-            else:
-                identifier = task['msg'].note
-                
+            identifier = task['msg'].note   
             current = self.active.get(identifier)
+            
             if current:
                 for anim in current.itervalues():
                     if anim.trigger == 'toggle':
@@ -52,11 +47,6 @@ class Handler(object):
             lengths = set( strip.length for strip in task['strips'])
             for length in lengths:
                 anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
-                
-                if isinstance(task['msg'], OSCMetaMessage):
-                    identifier = anim.msg.pattern
-                else:
-                    identifier = anim.msg.note
                     
                 if anim.trigger == 'toggle':
                     if identifier in self.active:
@@ -87,13 +77,8 @@ class Handler(object):
     def note_off(self, now):
         while not self.off.empty():
             msg = self.off.get()
+            current = self.active.get(msg.note) 
             
-            if isinstance(msg, OSCMetaMessage):
-                identifier = msg.pattern
-            else:
-                identifier = msg.note
-                
-            current = self.active.get(identifier) 
             if current:
                 for anim in current.itervalues():
                     
@@ -109,13 +94,8 @@ class Handler(object):
     def expire(self):
         while not self.expiry.empty():
             expire = self.expiry.get()
-            
-            if isinstance(expire.msg, OSCMetaMessage):
-                identifier = expire.msg.pattern
-            else:
-                identifier = expire.msg.note
                 
-            if identifier in self.active:
-                self.end_animation(identifier, expire, self.strips)
+            if expire.msg.note in self.active:
+                self.end_animation(expire.msg.note, expire, self.strips)
             elif id(expire) in self.active:
                 self.end_animation(id(expire), expire, self.strips)

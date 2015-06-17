@@ -7,4 +7,4 @@ if __name__ == '__main__':
     while True:
         for msg in bridge.iter_pending():
             output.send(msg)
-            time.sleep(1/100.)
+        time.sleep(1/60.)

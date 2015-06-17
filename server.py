@@ -1,19 +1,11 @@
 import time
 import opc
 import numpy as np
-import socket
 
-from strip import Strip
 from handler import Handler
-from controller import MasterController, MidiController, OSCController
 
-from animations.motion_tween import MotionTween, BackwardMotionTween
-from animations.positional   import Positional
-from animations.perlin       import Perlin
-from animations.clear_osc    import ClearOSC
-
-NUM_PIXELS = 300
 FPS = 1/60.
+NUM_PIXELS = 300
 
 class Universe(object):
 
@@ -47,14 +39,11 @@ class Universe(object):
                 ])
                 client.last = time.time()
                 client.bus.put_pixels(pixels)
-            
-            
         
 class Client(object):
     
-    def __init__(self, location, strips, local=False):
+    def __init__(self, location, strips):
         self.bus = opc.Client(location)
-        self.local = local
         self.strips = strips
         self.last = time.time()
         
@@ -64,44 +53,3 @@ class Client(object):
         else:
             print 'Not connected to client: {0}'.format(location)
             self.connected = False
-        
-if __name__ == '__main__':
-    
-    strips = tuple( Strip(x) for x in [NUM_PIXELS] * 48 )
-        
-    #client = Client("beaglebone.local:7890", strips)
-    client = Client("localhost:7890", strips)
-    
-    total_pixels = 0
-    for strip in strips:
-        total_pixels += strip.length
-        
-    total_strips = 0
-    for strip in strips:
-        if not strip.length == 1:
-            total_strips += 1
-            
-    print 'Total strips in universe: {0}'.format(total_strips)
-    print 'Total pixels in universe: {0}'.format(total_pixels)
-    
-    controllers = MasterController({
-       'midi': MidiController("IAC Driver Bus 1"),
-       'osc':  OSCController(socket.gethostbyname(socket.gethostname()), 7000),
-       #'nexus': MidiController("IAC Driver Bus 2"),
-    })
-    
-    controllers['midi'].add_trigger(
-        [60],
-        channel=1,
-        animation=MotionTween,
-        strips=strips
-    )
-    
-    controllers['midi'].add_trigger(
-        [62],
-        channel=1,
-        animation=Perlin,
-        strips=strips
-    )
-    
-    universe = Universe(client, strips, controllers)
