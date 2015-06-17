@@ -1,4 +1,4 @@
-from gevent.queue import Queue
+from Queue import Queue
 
 class Handler(object):
     
