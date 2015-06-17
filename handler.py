@@ -69,8 +69,8 @@ class Handler(object):
         
     def end_animation(self, identifier, anim, strips):
         for strip in strips:
-            if identifier in strip.active:
-                if strip.length == anim.length:
+            if strip.length == anim.length:
+                if identifier in strip.active:
                     strip.active.pop(identifier)
         self.active.pop(identifier)
 
@@ -94,8 +94,9 @@ class Handler(object):
     def expire(self):
         while not self.expiry.empty():
             expire = self.expiry.get()
-                
-            if expire.msg.note in self.active:
-                self.end_animation(expire.msg.note, expire, self.strips)
-            elif id(expire) in self.active:
-                self.end_animation(id(expire), expire, self.strips)
+            if expire.trigger in ('hold', 'toggle'):
+                identifier = expire.msg.note
+            else:
+                identifier = id(expire)
+    
+            self.end_animation(identifier, expire, self.strips)

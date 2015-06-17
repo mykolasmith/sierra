@@ -15,7 +15,7 @@ class Animation(object):
         self.running = False
         self.done = False
         
-        self.pixels = np.array([(0,0,0)] * length, dtype=np.uint8)
+        self.pixels = np.zeros((length,3))
         
     def run(self, deltaMs):
         pass
@@ -41,7 +41,7 @@ class Animation(object):
         return np.array(colorsys.hsv_to_rgb(h, s, b)) * 255
             
     def fade_down(self, deltaMs, decay):
-        if deltaMs > decay:
+        if deltaMs >= decay:
             self.done = True
             self.pixels[...] = 0
         else:
