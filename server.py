@@ -43,7 +43,7 @@ class Universe(object):
             
             # Only send to the hardware,
             # if the frame rate requires it.
-            if client.connected and time.time() - client.last >= fps:
+            if client.connected:
 
                 # Aggregrate active animations onto a single frame per strip
                 for strip in strips:
@@ -57,6 +57,8 @@ class Universe(object):
                 client.last = time.time()
                 
             handler.expire()
+        
+            time.sleep(fps)
             
         
 class Client(object):

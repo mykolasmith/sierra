@@ -55,9 +55,8 @@ class Positional(Animation):
         # Fade down at a rate determined by the decay parameter.
         self.refresh_params()
         if deltaMs >= self.decay:
-            self.pixes = [...]
+            self.pixels[...] = 0
             self.done = True
         else:
             factor = 1.0 - (deltaMs / self.decay)
             self.pixels = self.pixels_at_inflection * factor
-        self.fade_down(deltaMs, self.decay + 0.01)

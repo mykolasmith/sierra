@@ -71,4 +71,10 @@ class Perlin(Animation):
         self.z += self.speed + 0.01
         
     def off(self, deltaMs):
-        self.fade_down(deltaMs, self.decay)
+        self.refresh_params()
+        if deltaMs >= self.decay:
+            self.pixels[...] = 0
+            self.done = True
+        else:
+            factor = 1.0 - (deltaMs / self.decay)
+            self.pixels = self.pixels_at_inflection * factor

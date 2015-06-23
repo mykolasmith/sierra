@@ -32,7 +32,7 @@ class Handler(object):
                 if anim.done:
                     self.expiry.put(anim)
                 else:
-                    if anim.run != anim.off
+                    if anim.run != anim.off:
                         # We need to clear the pixels before we work
                         # the worker will replace them with the correct pixels
                         # at this exact point in time.
