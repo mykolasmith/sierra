@@ -6,24 +6,38 @@ class Animation(object):
     
     def __init__(self, length, controllers, msg, notes, trigger):
         self.length = length
-        
         self.controllers = controllers
         self.msg = msg
         self.notes = notes
         self.trigger = trigger
         
+        # Running / done let the handler and worker know when to
+        # stop animating and remove from the active animation queue.
         self.running = False
         self.done = False
         
+        # Each animation operates on it's own frame
+        # of pixel values: [[R,G,B],[R,G,B],...]
         self.pixels = np.zeros((length,3))
         
     def run(self, deltaMs):
+        # Each animation is passed the amount of time elapsed since it began,
+        # whenever the worker comes back to it in the event loop.
+        # This implementation is how most physics / graphics engines do procedural animations.
         pass
         
     def off(self, deltaMs):
-        self.pixels[...] = 0
+        # "Off" is the opposite of "run" in that off *becomes* the run function
+        # when certain conditions occur for certain animation types.
+        # This mimics common musical performance patterns: 
+        # e.g. oneshot, hold, toggle.
+        # This is useful for when you want to do something *other* than
+        # immediately turn off the lights when a key is let go off or untoggled.
+        pass
         
     def normalize(self, val, prev_min, prev_max, new_min, new_max):
+        # Given a previous min / max (e.g. MIDI 0-127),
+        # return a normalized decimal value for a new min and max (e.g. 0-1).
         if val == prev_min:
             return new_min
         elif val == prev_max:
@@ -32,18 +46,15 @@ class Animation(object):
             return (float(val) / (prev_max - prev_min)) * (new_max - new_min)
             
     def refresh_params(self):
+        # Accepts a dictionary of devices and parameters
+        # and stores their current value from the controller state
+        # as an instance variable on the animation.
         params = self.controllers.parse_params(self.msg.channel, self.params)
         for param, val in params.iteritems():
             setattr(self, param, val)
         
     def hsb_to_rgb(self, h, s, b):
-        # Scale hsv by max, e.g. MIDI 1-127 knob, convert to RGB, and return as numpy array
+        # The colorsys module returns a 0-1 value for R,G,B
+        # based on different hue, saturation, or brightness values.
+        # We multiply by 255 in order to get 0-255 normalized values.
         return np.array(colorsys.hsv_to_rgb(h, s, b)) * 255
-            
-    def fade_down(self, deltaMs, decay):
-        if deltaMs >= decay:
-            self.done = True
-            self.pixels[...] = 0
-        else:
-            factor = 1.0 - (deltaMs / decay)
-            self.pixels = self.pixels_at_inflection * factor

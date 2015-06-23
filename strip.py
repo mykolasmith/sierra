@@ -4,11 +4,7 @@ class Strip(object):
     
     def __init__(self, length):
         self.length = length
-        
-        # Each strip has a master frame that gets aggregated from the active animations' frame
         self.pixels = np.zeros((length, 3))
-        
-        # Keep track of the active animations
         self.active = {}
 
     def aggregate(self):
@@ -21,5 +17,3 @@ class Strip(object):
                 for anim
                 in self.active.itervalues()
             ])
-        else:
-            self.pixels[...] = 0

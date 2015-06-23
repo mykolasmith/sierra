@@ -6,10 +6,19 @@ class Handler(object):
         self.strips = strips
         self.controllers = controllers
         
+        # Note on MIDI messages waiting to be attached to an animaton
         self.on = Queue()
+        
+        # Note off MIDI messages waiting to schedule expiry
         self.off = Queue()
+        
+        # Messages for which we will remove the corresponding animation
+        # from the active animations dictionary.
         self.expiry = Queue()
         
+        # A map of strip lengths to animation identifiers.
+        # So that we are only doing work on a single animation,
+        # regardless of if that animation appears on many strips.
         self.active = {}
         
     def worker(self, now):
@@ -23,18 +32,26 @@ class Handler(object):
                 if anim.done:
                     self.expiry.put(anim)
                 else:
-                    if anim.run != anim.off:
+                    if anim.run != anim.off
+                        # We need to clear the pixels before we work
+                        # the worker will replace them with the correct pixels
+                        # at this exact point in time.
                         anim.pixels[...] = 0
                     anim.run(now - anim.t0)
         
     def note_on(self, now):
         while not self.on.empty():
             task = self.on.get()
-            identifier = task['msg'].note   
+            identifier = task['msg'].note
             current = self.active.get(identifier)
             
             if current:
+                # If the MIDI message note refers to an animation that is already active,
+                # then we know that it is either a 'hold' or 'toggle'
+                # (oneshots have a unique ID)
                 for anim in current.itervalues():
+                    # If a toggle exists for this note, and send another note_on
+                    # then it's time to turn this animation off
                     if anim.trigger == 'toggle':
                         if anim.run != anim.off:
                             anim.t0 = now
@@ -44,10 +61,15 @@ class Handler(object):
                         else:
                             self.end_animation(identifier, anim, task['strips'])
                  
+            # This is where we schedule the animation depending on the unique
+            # strip lengths for which we wish to trigger this animation
+            # task['animation'] = Animation class (e.g. MotionTween)
+            # which gets called with the strip length, master controller, MIDI message,
+            # and range of notes associated with the animation.
             lengths = set( strip.length for strip in task['strips'])
             for length in lengths:
                 anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
-                    
+
                 if anim.trigger == 'toggle':
                     if identifier in self.active:
                         break

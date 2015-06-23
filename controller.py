@@ -7,12 +7,24 @@ from handler import Handler
 class MasterController(object):
     
     def __init__(self, controllers):
+        # Hold all of the controllers in this class (MIDI, OSC, etc.)
         self.controllers = controllers
         
     def __getitem__(self, item):
+        # Allow the master controller to be accessed like a normal dictionary.
         return self.controllers[item]
         
+    def itervalues(self, *args, **kwargs):
+        # Iterate over the master controller's devices.
+        return self.controllers.itervalues()
+        
     def parse_params(self, channel, params):
+        # Parse a dictionary of parameters, patterns (conditions) and defaults
+        # In order to determine the proper input source to use.
+        # E.g. {0.5, ['osc', '/fader1'], ['midi', 16]}
+        # The above example will check for a fader1 value from the OSC controller,
+        # and if not found will check for control 16 from the midi controller,
+        # and if neither are connected then it will return the default: 0.5
         result = dict()
         for param, conditions in params.iteritems():
             default = None
@@ -33,6 +45,9 @@ class MasterController(object):
         return result
         
     def bind(self, handler):
+        # Expose the handler to the each bound controller
+        # So that the controller can tell the handler
+        # when to fire new animations.
         if type(handler) == Handler:
             for controller in self.controllers.itervalues():
                 controller.handler = handler
@@ -41,9 +56,6 @@ class MasterController(object):
         if controller_name in self.controllers:
             return self.controllers[controller_name].get(channel, param, default)
         return default
-        
-    def itervalues(self, *args, **kwargs):
-        return self.controllers.itervalues()
 
 class MidiController(object):
     
@@ -54,16 +66,25 @@ class MidiController(object):
         self.triggers = dict( (channel, {}) for channel in xrange(1,17) )
         
     def normalize(self, val):
+        # Since we want to work with 0-1 decimal values
+        # Automatically normalize incoming MIDI parameters.
         return val / 127.
         
     def listen(self):
+        
         for msg in self.bus.iter_pending():
+            # We increment channels by 1, since most DAWs index from 1
+            # whereas the midi spec indexes from 0.
+            # This should be applied at the GUI level instead.
             if msg.channel <= 15:
                 msg.channel += 1
             self.dispatch(msg)
             
     def dispatch(self, msg):
         
+        # Implementation of the MIDI spec would look something like this:
+        # 0x90 == 'note_on', 0x80 == 'note_off', etc.
+        # The "mido" package is  an awesome python library that encapsulates that for us.
         if msg.type == 'note_on':
             self.note_on(msg)
         elif msg.type == 'note_off':
@@ -74,6 +95,8 @@ class MidiController(object):
             self.update_pitchwheel(msg)
         
     def add_trigger(self, notes, channel, animation, strips):
+        # This will map the given MIDI notes fired from a given MIDI channel,
+        # to trigger an animation on the given LED strips.
         for note in notes:
             self.triggers[channel][note] = {
                 'animation' : animation,
@@ -118,10 +141,19 @@ class OSCController(object):
         return self.controls[channel].get(param, None)
         
     def listen(self):
+        # This is kind of hacky right now
+        # But instead of registering a callback for each pattern,
+        # we just override the noCallback handler and handle everything
+        # with a single dispatch function.
         self.server.noCallback_handler = self.dispatch
         self.server.handle_request()
         
     def dispatch(self, pattern, tags, data, addr):
+        # For now only rotary and fader (i.e. control parameters) are implemented.
+        # I prefer to leave the triggers to a MIDI controller.
+        # Although, many OSC clients can mimic MIDI.
+        # This is because it allows me stay within my Ableton / midi sequencer workflow
+        # For looping / quantization of animations to a common tempo.
         expr = pattern.split('/')[1:]
         channel, pattern = expr[0:1]
         channel = int(channel)
