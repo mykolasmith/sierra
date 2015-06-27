@@ -4,21 +4,25 @@ import math
 
 class Animation(object):
     
-    def __init__(self, length, controllers, msg, notes, trigger):
+    def __init__(self, length, controllers, msg, notes, params, trigger):
         self.length = length
         self.controllers = controllers
         self.msg = msg
         self.notes = notes
+        self.params = params
         self.trigger = trigger
         
         # Running / done let the handler and worker know when to
         # stop animating and remove from the active animation queue.
         self.running = False
+        self.runner = self.run
         self.done = False
         
         # Each animation operates on it's own frame
         # of pixel values: [[R,G,B],[R,G,B],...]
         self.pixels = np.zeros((length,3))
+        
+        self.refresh_params()
         
     def run(self, deltaMs):
         # Each animation is passed the amount of time elapsed since it began,
@@ -35,15 +39,15 @@ class Animation(object):
         # immediately turn off the lights when a key is let go off or untoggled.
         pass
         
-    def normalize(self, val, prev_min, prev_max, new_min, new_max):
+    def normalize(self, val, new_min, new_max):
         # Given a previous min / max (e.g. MIDI 0-127),
         # return a normalized decimal value for a new min and max (e.g. 0-1).
-        if val == prev_min:
+        if val == 0.0:
             return new_min
-        elif val == prev_max:
+        elif val == 1.0:
             return new_max
         else:
-            return (float(val) / (prev_max - prev_min)) * (new_max - new_min)
+            return (float(val) / 1.) * (new_max - new_min)
             
     def refresh_params(self):
         # Accepts a dictionary of devices and parameters

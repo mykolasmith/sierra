@@ -94,14 +94,15 @@ class MidiController(object):
         elif msg.type == 'pitchwheel':
             self.update_pitchwheel(msg)
         
-    def add_trigger(self, notes, channel, animation, strips):
+    def add_trigger(self, notes, channel, animation, strips, params):
         # This will map the given MIDI notes fired from a given MIDI channel,
         # to trigger an animation on the given LED strips.
         for note in notes:
             self.triggers[channel][note] = {
                 'animation' : animation,
                 'strips'    : strips,
-                'notes'     : notes
+                'notes'     : notes,
+                'params'    : params
             }
         
     def note_on(self, msg):
@@ -111,6 +112,7 @@ class MidiController(object):
                 'strips' : mapping.get('strips'),
                 'animation' : mapping.get('animation'),
                 'notes' : mapping.get('notes'),
+                'params' : mapping.get('params'),
                 'msg' : msg,
             })
     

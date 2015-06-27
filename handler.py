@@ -37,7 +37,7 @@ class Handler(object):
                         # the worker will replace them with the correct pixels
                         # at this exact point in time.
                         anim.pixels[...] = 0
-                    anim.run(now - anim.t0)
+                    anim.runner(now - anim.t0)
         
     def note_on(self, now):
         while not self.on.empty():
@@ -56,7 +56,7 @@ class Handler(object):
                         if anim.run != anim.off:
                             anim.t0 = now
                             anim.pixels_at_inflection = anim.pixels
-                            anim.run = anim.off
+                            anim.runner = anim.off
                             break
                         else:
                             self.end_animation(identifier, anim, task['strips'])
@@ -68,7 +68,7 @@ class Handler(object):
             # and range of notes associated with the animation.
             lengths = set( strip.length for strip in task['strips'])
             for length in lengths:
-                anim = task['animation'](length, self.controllers, task['msg'], task['notes'])
+                anim = task['animation'](length, self.controllers, task['msg'], task['notes'], task['params'])
 
                 if anim.trigger == 'toggle':
                     if identifier in self.active:
@@ -110,7 +110,7 @@ class Handler(object):
                     if anim.trigger == 'hold':
                         anim.t0 = now
                         anim.pixels_at_inflection = anim.pixels
-                        anim.run = anim.off
+                        anim.runner = anim.off
                     
                 
     def expire(self):

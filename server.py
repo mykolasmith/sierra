@@ -6,7 +6,7 @@ from handler import Handler
 
 class Universe(object):
 
-    def __init__(self, client, strips, controllers, num_pixels=300, fps=1/60.):
+    def __init__(self, client, strips, controllers, num_pixels, fps):
         print 'Total pixels per channel: {0}'.format(num_pixels)
         print 'Starting Universe...'
         
@@ -41,10 +41,8 @@ class Universe(object):
             # Update animation frames for given time
             handler.worker(now)
             
-            # Only send to the hardware,
-            # if the frame rate requires it.
+            
             if client.connected:
-
                 # Aggregrate active animations onto a single frame per strip
                 for strip in strips:
                     strip.aggregate()
