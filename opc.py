@@ -1,9 +1,25 @@
 import socket
 import numpy as np
 
+class Host(object):
+    
+    def __init__(self, server_ip_port):
+
+        self._ip, self._port = server_ip_port.split(':')
+        self._port = int(self._port)
+        
+        try:
+            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._socket.connect((self._ip, self._port))
+            self._should_connect = True
+            self._connected = True
+        except:
+            self._should_connect = False
+            self._connected = False
+
 class Client(object):
 
-    def __init__(self, server_ip_port, long_connection=True, verbose=False):
+    def __init__(self, locations):
         """Create an OPC client object which sends pixels to an OPC server.
 
         server_ip_port should be an ip:port or hostname:port as a single string.
@@ -25,60 +41,28 @@ class Client(object):
         If verbose is True, the client will print debugging info to the console.
 
         """
-        self.verbose = verbose
+        
+        self._hosts = []
+        
+        for location in locations:
+            h = Host(location)
+            self._hosts.append(h)
 
-        self._long_connection = long_connection
-
-        self._ip, self._port = server_ip_port.split(':')
-        self._port = int(self._port)
-
-        self._socket = None  # will be None when we're not connected
-
-    def _debug(self, m):
-        if self.verbose:
-            print '    %s' % str(m)
-
-    def _ensure_connected(self):
+    def _check_connection(self):
         """Set up a connection if one doesn't already exist.
 
         Return True on success or False on failure.
 
         """
-        if self._socket:
-            self._debug('_ensure_connected: already connected, doing nothing')
-            return True
-
-        try:
-            self._debug('_ensure_connected: trying to connect...')
-            self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self._socket.connect((self._ip, self._port))
-            self._debug('_ensure_connected:    ...success')
-            return True
-        except socket.error:
-            self._debug('_ensure_connected:    ...failure')
-            self._socket = None
-            return False
-
-    def disconnect(self):
-        """Drop the connection to the server, if there is one."""
-        self._debug('disconnecting')
-        if self._socket:
-            self._socket.close()
-        self._socket = None
-
-    def can_connect(self):
-        """Try to connect to the server.
-
-        Return True on success or False on failure.
-
-        If in long connection mode, this connection will be kept and re-used for
-        subsequent put_pixels calls.
-
-        """
-        success = self._ensure_connected()
-        if not self._long_connection:
-            self.disconnect()
-        return success
+        for host in self._hosts:
+            if host._should_connect and not host._connected:
+                print 'Reconnecting to: ' + host._ip + ":" + str(host._port)
+                try:
+                    host._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    host._socket.connect((host._ip, host._port))
+                    host._connected = True
+                except:
+                    pass
 
     def put_pixels(self, pixels, channel=0):
         """Send the list of pixel colors to the OPC server on the given channel.
@@ -103,28 +87,18 @@ class Client(object):
         LED at a time (unless it's the first one).
 
         """
-        self._debug('put_pixels: connecting')
-        is_connected = self._ensure_connected()
-        if not is_connected:
-            self._debug('put_pixels: not connected.  ignoring these pixels.')
-            return False
+        
+        self._check_connection()
 
         # build OPC message
         len_hi_byte = (len(pixels) * 3) / 256
         len_lo_byte = (len(pixels) * 3) % 256
         message = chr(channel) + chr(0) + chr(len_hi_byte) + chr(len_lo_byte) + pixels.tobytes()
-
-        self._debug('put_pixels: sending pixels to server')
-        try:
-            self._socket.send(message)
-        except socket.error:
-            self._debug('put_pixels: connection lost.  could not send pixels.')
-            self._socket = None
-            return False
-
-        if not self._long_connection:
-            self._debug('put_pixels: disconnecting')
-            self.disconnect()
-
-        return True
+        
+        for host in self._hosts:
+            if host._should_connect:
+                try:
+                    host._socket.send(message)
+                except:
+                    host._connected = False
 

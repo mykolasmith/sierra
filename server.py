@@ -42,17 +42,15 @@ class Universe(object):
             handler.worker(now)
             
             
-            if client.connected:
-                # Aggregrate active animations onto a single frame per strip
-                for strip in strips:
-                    strip.aggregate()
+            for strip in strips:
+                strip.aggregate()
                 
-                # Send maximum of 21,845 pixels per message (per OPC spec)
-                client.bus.put_pixels(np.concatenate([
-                    strip.pixels.astype(np.uint8)
-                    for strip in strips
-                ])[:21845])
-                client.last = time.time()
+            client.bus.put_pixels(np.concatenate([
+                strip.pixels.astype(np.uint8)
+                for strip in strips
+            ]))
+            
+            client.last = time.time()
                 
             handler.expire()
         
@@ -61,14 +59,7 @@ class Universe(object):
         
 class Client(object):
     
-    def __init__(self, location, strips):
-        self.bus = opc.Client(location)
+    def __init__(self, locations, strips):
+        self.bus = opc.Client(locations)
         self.strips = strips
         self.last = time.time()
-        
-        if self.bus.can_connect():
-            print 'Connected to client: {0}'.format(location)
-            self.connected = True
-        else:
-            print 'Not connected to client: {0}'.format(location)
-            self.connected = False
