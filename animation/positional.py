@@ -4,8 +4,8 @@ import math
 
 class Positional(Animation):
     
-    def __init__(self, length, controllers, msg, notes, params):
-        super(Positional, self).__init__(length, controllers, msg, notes, params, 'hold')
+    def __init__(self, config):
+        super(Positional, self).__init__(config, 'hold')
         
         # Look at the range of notes assigned to this animations
         # In order to determine the min and max
@@ -23,13 +23,13 @@ class Positional(Animation):
 
     def run(self, deltaMs):
         width = self.find_width(deltaMs)
-            
         if width == 1.0 or self.speed == 0.0:
             self.refresh_params()
         
         if deltaMs < self.attack:
             self.brightness = deltaMs / self.attack
-        
+        else:
+            self.brightness = 1.0
         
         self.draw(width)
         

@@ -1,5 +1,14 @@
 from Queue import Queue
 
+class AnimationConfig(object):
+    
+    def __init__(self, length, controllers, msg, notes, params):
+        self.length = length
+        self.controllers = controllers
+        self.msg = msg
+        self.notes = notes
+        self.params = params
+
 class Handler(object):
     
     def __init__(self, strips, controllers):
@@ -68,7 +77,8 @@ class Handler(object):
             # and range of notes associated with the animation.
             lengths = set( strip.length for strip in task['strips'])
             for length in lengths:
-                anim = task['animation'](length, self.controllers, task['msg'], task['notes'], task['params'])
+                config = AnimationConfig(length, self.controllers, task['msg'], task['notes'], task['params'])
+                anim = task['animation'](config)
 
                 if anim.trigger == 'toggle':
                     if identifier in self.active:

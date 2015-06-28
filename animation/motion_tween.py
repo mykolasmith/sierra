@@ -2,13 +2,13 @@ from base import Animation
 
 class MotionTween(Animation):
     
-    def __init__(self, length, controllers, msg, notes, params):
-        super(MotionTween, self).__init__(length, controllers, msg, notes, params, 'oneshot')
-        
+    def __init__(self, config):
+        super(MotionTween, self).__init__(config, 'oneshot')
         self.refresh_params()
         
         # Based on OSC values from 0-1, normalize them to a duration from 1/2 to 5 seconds.
-        self.duration = self.normalize(self.duration, 0.5, 5.)
+        self.duration = self.normalize(self.duration,
+         0.5, 5.)
         
         # The trail is the length of the motion tween,
         # again normalized from a length of 1-60 LEDs long.

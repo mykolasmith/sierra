@@ -4,12 +4,12 @@ import math
 
 class Animation(object):
     
-    def __init__(self, length, controllers, msg, notes, params, trigger):
-        self.length = length
-        self.controllers = controllers
-        self.msg = msg
-        self.notes = notes
-        self.params = params
+    def __init__(self, config, trigger):
+        self.length = config.length
+        self.controllers = config.controllers
+        self.msg = config.msg
+        self.notes = config.notes
+        self.params = config.params
         self.trigger = trigger
         
         # Running / done let the handler and worker know when to
@@ -20,7 +20,7 @@ class Animation(object):
         
         # Each animation operates on it's own frame
         # of pixel values: [[R,G,B],[R,G,B],...]
-        self.pixels = np.zeros((length,3))
+        self.pixels = np.zeros((config.length,3))
         
         self.refresh_params()
         

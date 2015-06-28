@@ -2,8 +2,8 @@ from base import Animation
 
 class Slider(Animation):
     
-    def __init__(self, length, controllers, msg, notes, params):
-        super(Slider, self).__init__(length, controllers, msg, notes, params, 'toggle')
+    def __init__(self, config):
+        super(Slider, self).__init__(config, 'toggle')
         
     def run(self, deltaMs):
         self.refresh_params()
@@ -20,3 +20,4 @@ class Slider(Animation):
             
     def off(self, deltaMs):
         self.done = True
+        

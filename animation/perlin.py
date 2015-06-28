@@ -4,8 +4,8 @@ import math
 
 class Perlin(Animation):
     
-    def __init__(self, length, controllers, msg, notes):
-        super(Perlin, self).__init__(length, controllers, msg, notes, 'toggle')
+    def __init__(self, config):
+        super(Perlin, self).__init__(config, 'toggle')
         
         self.scale = 0.01
         self.speed = 0.5
@@ -14,28 +14,6 @@ class Perlin(Animation):
         self.mmin = 0.0001
         self.decay = 0.25
         self.z = 0
-        
-        self.params = {
-            'saturation' : [
-                1.0,
-                ("midi", 1)
-            ],
-            'min_hue' : [
-                0,
-                ("osc", "rotary3"),
-                ("midi", 17)
-            ],
-            'max_hue' : [
-                1.0,
-                ("osc", "rotary4"),
-                ("midi", 18)
-            ],
-            'brightness' : [
-                1,
-                ("osc", "rotary5"),
-                ("midi", 8)
-            ]
-        }
         
         self.refresh_params()
         
