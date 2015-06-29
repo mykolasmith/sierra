@@ -1,8 +1,6 @@
 import mido
-import re
 
 from OSC import OSCServer
-from handler import Handler
 
 class MasterController(object):
     
@@ -43,14 +41,6 @@ class MasterController(object):
             else:
                 result.update({ param : default })
         return result
-        
-    def bind(self, handler):
-        # Expose the handler to the each bound controller
-        # So that the controller can tell the handler
-        # when to fire new animations.
-        if type(handler) == Handler:
-            for controller in self.controllers.itervalues():
-                controller.handler = handler
     
     def get(self, channel, controller_name, param, default):
         if controller_name in self.controllers:

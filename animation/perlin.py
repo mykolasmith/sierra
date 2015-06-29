@@ -8,11 +8,10 @@ class Perlin(Animation):
         super(Perlin, self).__init__(config, 'toggle')
         
         self.scale = 0.01
-        self.speed = 0.5
-        self.octave = 1
+        self.octaves = 1
         self.mmax = 0.0001
         self.mmin = 0.0001
-        self.decay = 0.25
+        self.decay = 1.0
         self.z = 0
         
         self.refresh_params()
@@ -20,7 +19,7 @@ class Perlin(Animation):
     def run(self, deltaMs):
 
         for x in range(self.length):
-            c = noise.pnoise3(x * self.scale, self.scale, self.z * self.scale, self.octave)
+            c = noise.pnoise3(x * self.scale, self.scale, self.z * self.scale, self.octaves )
             
             if c > self.mmax: self.mmax = c
             if c < self.mmin: self.mmin = c
@@ -28,7 +27,6 @@ class Perlin(Animation):
             c = c + math.fabs(self.mmin)
             c = c / (self.mmax + math.fabs(self.mmin))
             
-            c = (c + 0.2) % 1
             self.pixels[x] = self.hsb_to_rgb(c,self.saturation,self.brightness)
          
         # Speed of the animation

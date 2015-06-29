@@ -30,6 +30,10 @@ class Handler(object):
         # regardless of if that animation appears on many strips.
         self.active = {}
         
+        # Expose the handler to the controllers
+        for controller in controllers.itervalues():
+            controller.handler = self
+        
     def worker(self, now):
         for group in self.active.itervalues():
             for anim in group.itervalues():
@@ -41,7 +45,7 @@ class Handler(object):
                 if anim.done:
                     self.expiry.put(anim)
                 else:
-                    if anim.run != anim.off:
+                    if anim.runner != anim.off:
                         # We need to clear the pixels before we work
                         # the worker will replace them with the correct pixels
                         # at this exact point in time.
@@ -62,7 +66,7 @@ class Handler(object):
                     # If a toggle exists for this note, and send another note_on
                     # then it's time to turn this animation off
                     if anim.trigger == 'toggle':
-                        if anim.run != anim.off:
+                        if anim.runner != anim.off:
                             anim.t0 = now
                             anim.pixels_at_inflection = anim.pixels
                             anim.runner = anim.off
@@ -82,6 +86,7 @@ class Handler(object):
 
                 if anim.trigger == 'toggle':
                     if identifier in self.active:
+                        print self.active[identifier]
                         break
                     else:
                         self.begin_animation(identifier, anim, length, task['strips'])
@@ -113,6 +118,8 @@ class Handler(object):
             
             if current:
                 for anim in current.itervalues():
+                    
+                    print anim
                     
                     if anim.trigger == 'toggle':
                         break

@@ -18,7 +18,6 @@ class Universe(object):
         # And then copying the group frame to individual strip frames.
         
         handler = Handler(strips, controllers)
-        controllers.bind(handler)
         
         # Beaglebone / LEDscape/ WS2812 hardware constraint requires all channels 
         # to be the same # of LEDs. Generally, not an issue as most strips are
