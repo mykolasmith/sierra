@@ -2,6 +2,22 @@ import mido
 
 from OSC import OSCServer
 
+class Parameter(object):
+    
+    def __init__(self, name=None, default=None, controls=None):
+        if name is None:
+            raise RuntimeError("Cannot add unnamed parameter.")
+        
+        self.name = name
+        
+        if default is None:
+            default = 0.0
+        self.default = default
+        
+        if controls is None:
+            controls = []
+        self.controls = controls
+
 class MasterController(object):
     
     def __init__(self, controllers):
@@ -24,22 +40,19 @@ class MasterController(object):
         # and if not found will check for control 16 from the midi controller,
         # and if neither are connected then it will return the default: 0.5
         result = dict()
-        for param, conditions in params.iteritems():
-            default = None
+        for param in params:
             value = None
-            for condition in conditions:
-                if type(condition) in (int, float):
-                    default = condition
-                else:
-                    controller, accessor = condition
-                    if controller in self.controllers:
-                        value = self.controllers[controller].get(channel, accessor)
-                        if value is not None:
-                            break
+            default = param.default
+            for control in param.controls:
+                controller, accessor = control
+                if controller in self.controllers:
+                    value = self.controllers[controller].get(channel, accessor)
+                    if value is not None:
+                        break
             if value is not None:
-                result.update({ param : value })
+                result.update({ param.name : value })
             else:
-                result.update({ param : default })
+                result.update({ param.name : default })
         return result
     
     def get(self, channel, controller_name, param, default):

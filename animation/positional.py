@@ -16,14 +16,14 @@ class Positional(Animation):
         # position for a set of LEDs, depending on the note pressed.
         
         self.width = (1. / (self.max - self.min)) * self.length
-        self.start = int(msg.note * self.width)
+        self.start = int(self.msg.note * self.width)
         self.end = int(round(self.start + self.width))
         self.midpoint = self.start + (self.width // 2)
         self.last = self.width
 
     def run(self, deltaMs):
         width = self.find_width(deltaMs)
-        if width == 1.0 or self.speed == 0.0:
+        if width == 1.0 or self.oscillation == 0.0:
             self.refresh_params()
         
         if deltaMs < self.attack:
@@ -43,13 +43,12 @@ class Positional(Animation):
             self.draw(width)
             
     def find_width(self, deltaMs):
-        if self.speed != 0:
-            speed = self.normalize(self.speed, 0, 10)
-            return round(self.width * abs(math.sin(deltaMs * speed)))
+        if self.oscillation != 0:
+            oscillation = self.normalize(self.oscillation, 0, 10)
+            return round(self.width * abs(math.sin(deltaMs * oscillation)))
         return self.width
             
     def draw(self, width):
-        
         rgb = self.hsb_to_rgb(self.hue, self.saturation, self.brightness)
         self.pixels[self.midpoint] = rgb
         for px in reversed(xrange(1, int(round(width // 2)))):

@@ -20,5 +20,5 @@ class Slider(Animation):
                 self.pixels[point-px] = rgb * factor
             
     def off(self, deltaMs):
+        self.pixels[...] = 0
         self.done = True
-        
