@@ -14,7 +14,6 @@ class Slider(Animation):
             self.pixels[point] = rgb
         for px in xrange(1, width // 2):
             factor = 1 - (px / (width // 2.))
-            print factor
             if point+px < self.length:
                 self.pixels[point+px] = rgb * factor
             if point-px >= 0:

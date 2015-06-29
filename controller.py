@@ -147,8 +147,11 @@ class OSCController(object):
         # This is because it allows me stay within my Ableton / midi sequencer workflow
         # For looping / quantization of animations to a common tempo.
         expr = pattern.split('/')[1:]
-        channel, pattern = expr[0:1]
+        channel, pattern = expr
         channel = int(channel)
+        
+        if len(data) == 1:
+            data = data.pop()
             
         if pattern.find('rotary') >= 0 or\
            pattern.find('fader') >= 0:
