@@ -86,7 +86,6 @@ class Handler(object):
 
                 if anim.trigger == 'toggle':
                     if identifier in self.active:
-                        print self.active[identifier]
                         break
                     else:
                         self.begin_animation(identifier, anim, length, task['strips'])
@@ -118,8 +117,6 @@ class Handler(object):
             
             if current:
                 for anim in current.itervalues():
-                    
-                    print anim
                     
                     if anim.trigger == 'toggle':
                         break

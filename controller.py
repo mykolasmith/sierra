@@ -66,9 +66,9 @@ class MidiController(object):
             # We increment channels by 1, since most DAWs index from 1
             # whereas the midi spec indexes from 0.
             # This should be applied at the GUI level instead.
-            if msg.channel <= 15:
+            if msg.channel < 15:
                 msg.channel += 1
-            self.dispatch(msg)
+                self.dispatch(msg)
             
     def dispatch(self, msg):
         
