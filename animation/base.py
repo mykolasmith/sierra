@@ -15,8 +15,8 @@ class Animation(object):
         # Running / done let the handler and worker know when to
         # stop animating and remove from the active animation queue.
         self.running = False
-        self.runner = self.run
         self.done = False
+        self.runner = self.run
         
         # Each animation operates on it's own frame
         # of pixel values: [[R,G,B],[R,G,B],...]
@@ -40,14 +40,13 @@ class Animation(object):
         pass
         
     def normalize(self, val, new_min, new_max):
-        # Given a previous min / max (e.g. MIDI 0-127),
-        # return a normalized decimal value for a new min and max (e.g. 0-1).
+        # Return a normalized decimal value for a new min and max (e.g. 0-1).
         if val == 0.0:
             return new_min
         elif val == 1.0:
             return new_max
         else:
-            return (float(val) / 1.) * (new_max - new_min)
+            return float(val) * (new_max - new_min)
             
     def refresh_params(self):
         # Accepts a dictionary of devices and parameters

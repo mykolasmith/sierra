@@ -100,6 +100,14 @@ class MidiController(object):
     def add_trigger(self, notes, channel, animation, strips, params):
         # This will map the given MIDI notes fired from a given MIDI channel,
         # to trigger an animation on the given LED strips.
+        print "Notes:", notes
+        print "Channel:", channel
+        print "Animation:", animation
+        print "Parameters:"
+        for param in params:
+            print "\t" , param.name, ":", param.default, ":" , param.controls
+        print "----------------------"
+        
         for note in notes:
             self.triggers[channel][note] = {
                 'animation' : animation,
@@ -140,7 +148,6 @@ class OSCController(object):
         self.server = OSCServer((client_address, port))
         self.server.timeout = 0
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
-        self.triggers = dict( (channel, {}) for channel in xrange(1,17) )
         
     def get(self, channel, param):
         return self.controls[channel].get(param, None)

@@ -10,7 +10,6 @@ class Universe(object):
         print 'Total pixels per channel: {0}'.format(num_pixels)
         print 'Starting Universe...'
         
-        
         # The Handler makes sure we're doing the least
         # number of computations that are need,
         # by grouping animations by strip length.
