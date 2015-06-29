@@ -9,8 +9,8 @@ class Positional(Animation):
         
         # Look at the range of notes assigned to this animations
         # In order to determine the min and max
-        self.min = min(notes)
-        self.max = max(notes)
+        self.min = min(self.notes)
+        self.max = max(self.notes)
         
         # The min and max can then be used to deterine the correct
         # position for a set of LEDs, depending on the note pressed.

@@ -13,10 +13,12 @@ class Slider(Animation):
         if point < self.length:
             self.pixels[point] = rgb
         for px in xrange(1, width // 2):
+            factor = 1 - (px / (width // 2.))
+            print factor
             if point+px < self.length:
-                self.pixels[point+px] = rgb
+                self.pixels[point+px] = rgb * factor
             if point-px >= 0:
-                self.pixels[point-px] = rgb
+                self.pixels[point-px] = rgb * factor
             
     def off(self, deltaMs):
         self.done = True
