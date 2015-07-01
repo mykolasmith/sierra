@@ -45,11 +45,6 @@ class Handler(object):
                 if anim.done:
                     self.expiry.put(anim)
                 else:
-                    if anim.runner != anim.off:
-                        # We need to clear the pixels before we work
-                        # the worker will replace them with the correct pixels
-                        # at this exact point in time.
-                        anim.pixels[...] = 0
                     anim.runner(now - anim.t0)
         
     def note_on(self, now):
