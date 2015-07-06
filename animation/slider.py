@@ -3,7 +3,7 @@ from base import Animation
 class Slider(Animation):
     
     def __init__(self, config):
-        super(Slider, self).__init__(config, 'toggle')
+        super(Slider, self).__init__(config)
         
     def run(self, deltaMs):
         self.refresh_params()

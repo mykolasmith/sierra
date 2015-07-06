@@ -4,7 +4,8 @@ import math
 class MotionTween(Animation):
     
     def __init__(self, config):
-        super(MotionTween, self).__init__(config, 'oneshot')
+        super(MotionTween, self).__init__(config)
+        
         self.refresh_params()
         self.trail = xrange(0, int(self.normalize(self.trail_length, 1, 60)))
         
@@ -20,8 +21,8 @@ class MotionTween(Animation):
         rgb = self.hsb_to_rgb(self.hue,self.saturation,self.brightness)
         for offset in reversed(self.trail):
             factor = 1 - (float(offset) / len(self.trail))
-            px = abs(frame-offset)
-            if px < self.length and px > 0:
+            px = frame-offset
+            if 0 <= px < self.length:
                 self.pixels[px] = rgb * factor
                 
         if frame == self.num_frames:

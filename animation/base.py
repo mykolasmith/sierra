@@ -4,13 +4,13 @@ import math
 
 class Animation(object):
     
-    def __init__(self, config, trigger):
+    def __init__(self, config):
         self.length = config.length
         self.controllers = config.controllers
         self.msg = config.msg
         self.notes = config.notes
         self.params = config.params
-        self.trigger = trigger
+        self.trigger = config.trigger
         
         # Running / done let the handler and worker know when to
         # stop animating and remove from the active animation queue.
@@ -52,7 +52,7 @@ class Animation(object):
         # Accepts a dictionary of devices and parameters
         # and stores their current value from the controller state
         # as an instance variable on the animation.
-        params = self.controllers.parse_params(self.msg.channel, self.params)
+        params = self.controllers.params(self.msg.channel, self.params)
         for param, val in params.iteritems():
             setattr(self, param, val)
         

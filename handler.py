@@ -2,12 +2,13 @@ from Queue import Queue
 
 class AnimationConfig(object):
     
-    def __init__(self, length, controllers, msg, notes, params):
+    def __init__(self, length, controllers, msg, notes, params, trigger):
         self.length = length
         self.controllers = controllers
         self.msg = msg
         self.notes = notes
         self.params = params
+        self.trigger = trigger
 
 class Handler(object):
     
@@ -41,6 +42,8 @@ class Handler(object):
                 if not anim.running:
                     anim.running = True
                     anim.t0 = now
+                    
+                anim.pixels[...] = 0
     
                 if anim.done:
                     self.expiry.put(anim)
@@ -76,7 +79,7 @@ class Handler(object):
             # and range of notes associated with the animation.
             lengths = set( strip.length for strip in task['strips'])
             for length in lengths:
-                config = AnimationConfig(length, self.controllers, task['msg'], task['notes'], task['params'])
+                config = AnimationConfig(length, self.controllers, task['msg'], task['notes'], task['params'], task['trigger'])
                 anim = task['animation'](config)
 
                 if anim.trigger == 'toggle':

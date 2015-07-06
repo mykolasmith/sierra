@@ -1,6 +1,7 @@
 import mido
 
 from OSC import OSCServer
+from animation.base import Animation
 
 class Parameter(object):
     
@@ -26,13 +27,14 @@ class MasterController(object):
         
     def __getitem__(self, item):
         # Allow the master controller to be accessed like a normal dictionary.
-        return self.controllers[item]
+        if item in self.controllers:
+            return self.controllers[item]
         
     def itervalues(self, *args, **kwargs):
         # Iterate over the master controller's devices.
         return self.controllers.itervalues()
         
-    def parse_params(self, channel, params):
+    def params(self, channel, params):
         # Parse a dictionary of parameters, patterns (conditions) and defaults
         # In order to determine the proper input source to use.
         # E.g. {0.5, ['osc', '/fader1'], ['midi', 16]}
@@ -43,8 +45,7 @@ class MasterController(object):
         for param in params:
             value = None
             default = param.default
-            for control in param.controls:
-                controller, accessor = control
+            for controller, accessor in param.controls:
                 if controller in self.controllers:
                     value = self.controllers[controller].get(channel, accessor)
                     if value is not None:
@@ -54,11 +55,6 @@ class MasterController(object):
             else:
                 result.update({ param.name : default })
         return result
-    
-    def get(self, channel, controller_name, param, default):
-        if controller_name in self.controllers:
-            return self.controllers[controller_name].get(channel, param, default)
-        return default
 
 class MidiController(object):
     
@@ -97,12 +93,31 @@ class MidiController(object):
         elif msg.type == 'pitchwheel':
             self.update_pitchwheel(msg)
         
-    def add_trigger(self, notes, channel, animation, strips, params):
+    def add_trigger(self, notes=None, channel=None, animation=None, strips=None, trigger=None, params=None):
         # This will map the given MIDI notes fired from a given MIDI channel,
         # to trigger an animation on the given LED strips.
+        
+        if notes is None:
+            raise RuntimeError("MIDI trigger must reference a list of notes. E.g. [60] or xrange(60,70)")
+            
+        if channel is None:
+            raise RuntimeError("MIDI trigger must reference a MIDI channel")
+        if not 0 < channel <= 16:
+            raise RuntimeError("MIDI trigger must reference a MIDI channel between 1 and 16")
+            
+        if animation is None:
+            raise RuntimeError("MIDI trigger must reference an Animation class")
+            
+        if strips is None:
+            raise RuntimeError("MIDI trigger must reference a list of Strip objects")
+            
+        if trigger is None:
+            raise RuntimeError("MIDI trigger must specify a trigger mode. E.g. hold, oneshot, or toggle")
+        
         print "Notes:", notes
         print "Channel:", channel
         print "Animation:", animation
+        print "Trigger:", trigger
         print "Parameters:"
         for param in params:
             print "\t" , param.name, ":", param.default, ":" , param.controls
@@ -113,7 +128,8 @@ class MidiController(object):
                 'animation' : animation,
                 'strips'    : strips,
                 'notes'     : notes,
-                'params'    : params
+                'params'    : params,
+                'trigger'   : trigger
             }
         
     def note_on(self, msg):
@@ -124,6 +140,7 @@ class MidiController(object):
                 'animation' : mapping.get('animation'),
                 'notes' : mapping.get('notes'),
                 'params' : mapping.get('params'),
+                'trigger': mapping.get('trigger'),
                 'msg' : msg,
             })
     
