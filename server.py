@@ -6,8 +6,8 @@ from handler import Handler
 
 class Universe(object):
 
-    def __init__(self, client, strips, controllers, num_pixels, fps):
-        print 'Total pixels per channel: {0}'.format(num_pixels)
+    def __init__(self, client, strips, controllers, max_pixels, fps):
+        print 'Maximum pixels per channel: {0}'.format(max_pixels)
         print 'Starting Universe...'
         
         # The Handler makes sure we're doing the least
@@ -21,9 +21,7 @@ class Universe(object):
         # Beaglebone / LEDscape/ WS2812 hardware constraint requires all channels 
         # to be the same # of LEDs. Generally, not an issue as most strips are
         # 300 LEDs (5m) or less.
-        for strip in strips:
-            strip.pixels.resize((num_pixels,3))
-        
+            
         while True:
             
             # Easy to implement new controller types
@@ -42,22 +40,15 @@ class Universe(object):
             
             for strip in strips:
                 strip.aggregate()
+                strip.pixels.resize((max_pixels,3)) 
                 
-            client.bus.put_pixels(np.concatenate([
+            pixels = np.concatenate([
                 strip.pixels.astype(np.uint8)
                 for strip in strips
-            ]))
-            
-            client.last = time.time()
+            ])
+                
+            client.put_pixels(pixels)
                 
             handler.expire()
         
             time.sleep(fps)
-            
-        
-class Client(object):
-    
-    def __init__(self, locations, strips):
-        self.bus = opc.Client(locations)
-        self.strips = strips
-        self.last = time.time()

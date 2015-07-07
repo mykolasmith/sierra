@@ -9,6 +9,7 @@ class Host(object):
         try:
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.connect((self._ip, self._port))
+            self._socket.setblocking(0)
             self._should_connect = True
             self._connected = True
             print 'Connected to host: ' + self._ip + ":" + str(self._port)
@@ -28,6 +29,7 @@ class Client(object):
                 try:
                     host._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     host._socket.connect((host._ip, host._port))
+                    host._socket.setblocking(0)
                     host._connected = True
                 except:
                     host._connected = False
