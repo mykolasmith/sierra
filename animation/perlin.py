@@ -22,9 +22,8 @@ class Perlin(Animation):
 
     def run(self, deltaMs):
         self.refresh_params()
-        self.brightness_factor = 1.0
         if deltaMs < self.attack:
-            self.brightness_factor = deltaMs / self.attack
+            self.brightness = self.brightness * (deltaMs / self.attack)
         self.draw()
             
     def draw(self):
@@ -53,7 +52,7 @@ class Perlin(Animation):
                     distance = c - self.hue
                     c = c - (c * distance)
             
-            self.pixels[x] = self.hsb_to_rgb(c, self.saturation, brightness * self.brightness_factor)
+            self.pixels[x] = self.hsb_to_rgb(c, self.saturation, brightness * self.brightness)
          
         self.z += self.normalize(self.speed, 0.01, 10.0)
         
@@ -63,5 +62,5 @@ class Perlin(Animation):
             self.pixels[...] = 0
             self.done = True
         else:
-            self.brightness_factor = 1 - (deltaMs / self.decay)
+            self.brightness = self.brightness * (1 - (deltaMs / self.decay))
             self.draw()

@@ -12,5 +12,4 @@ def callback(path, tags, args, source):
 
 while True:
     server.noCallback_handler = callback
-    time.sleep(1)
     server.handle_request()

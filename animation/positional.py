@@ -31,15 +31,6 @@ class Positional(Animation):
             self.brightness = 1.0
         
         self.draw(width)
-        
-    def off(self, deltaMs):
-        if deltaMs >= self.decay:
-            self.pixels[...] = 0
-            self.done = True
-        else:
-            self.brightness = 1 - (deltaMs / self.decay)
-            width = self.find_width(deltaMs)
-            self.draw(width)
             
     def find_width(self, deltaMs):
         if self.oscillation != 0:

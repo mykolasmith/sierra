@@ -75,9 +75,10 @@ class MidiController(object):
             # We increment channels by 1, since most DAWs index from 1
             # whereas the midi spec indexes from 0.
             # This should be applied at the GUI level instead.
-            if msg.channel < 15:
-                msg.channel += 1
-                self.dispatch(msg)
+            if msg.type in ('control_change, note_on, note_off'):
+                if msg.channel < 15:
+                    msg.channel += 1
+                    self.dispatch(msg)
             
     def dispatch(self, msg):
         
@@ -184,6 +185,9 @@ class OSCController(object):
         # This is because it allows me stay within my Ableton / midi sequencer workflow
         # For looping / quantization of animations to a common tempo.
         expr = pattern.split('/')[1:]
+        if len(expr) > 2:
+            return
+        
         channel, pattern = expr
         channel = int(channel)
         
