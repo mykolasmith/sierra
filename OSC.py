@@ -17,32 +17,6 @@ FloatTypes = [types.FloatType]
 global IntTypes
 IntTypes = [types.IntType]
 
-##
-# numpy/scipy support:
-##
-
-try:
-	from numpy import typeDict
-
-	for ftype in ['float32', 'float64', 'float128']:
-		try:
-			FloatTypes.append(typeDict[ftype])
-		except KeyError:
-			pass
-		
-	for itype in ['int8', 'int16', 'int32', 'int64']:
-		try:
-			IntTypes.append(typeDict[itype])
-			IntTypes.append(typeDict['u' + itype])
-		except KeyError:
-			pass
-		
-	# thanks for those...
-	del typeDict, ftype, itype
-	
-except ImportError:
-	pass
-
 ######
 #
 # OSCMessage classes
@@ -558,201 +532,6 @@ def decodeOSC(data):
 
 	return decoded
 
-######
-#
-# Utility functions
-#
-######
-
-def hexDump(bytes):
-	""" Useful utility; prints the string in hexadecimal.
-	"""
-	print "byte   0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F"
-
-	num = len(bytes)
-	for i in range(num):
-		if (i) % 16 == 0:
-			 line = "%02X0 : " % (i/16)
-		line += "%02X " % ord(bytes[i])
-		if (i+1) % 16 == 0:
-			print "%s: %s" % (line, repr(bytes[i-15:i+1]))
-			line = ""
-
-	bytes_left = num % 16
-	if bytes_left:
-		print "%s: %s" % (line.ljust(54), repr(bytes[-bytes_left:]))
-
-def getUrlStr(*args):
-	"""Convert provided arguments to a string in 'host:port/prefix' format
-	Args can be:
-	  - (host, port)
-	  - (host, port), prefix
-	  - host, port
-	  - host, port, prefix
-	"""
-	if not len(args):
-		return ""
-		
-	if type(args[0]) == types.TupleType:
-		host = args[0][0]
-		port = args[0][1]
-		args = args[1:]
-	else:
-		host = args[0]
-		port = args[1]
-		args = args[2:]
-		
-	if len(args):
-		prefix = args[0]
-	else:
-		prefix = ""
-	
-	if len(host) and (host != '0.0.0.0'):
-		try:
-			(host, _, _) = socket.gethostbyaddr(host)
-		except socket.error:
-			pass
-	else:
-		host = 'localhost'
-	
-	if type(port) == types.IntType:
-		return "%s:%d%s" % (host, port, prefix)
-	else:
-		return host + prefix
-		
-def parseUrlStr(url):
-	"""Convert provided string in 'host:port/prefix' format to it's components
-	Returns ((host, port), prefix)
-	"""
-	if not (type(url) in types.StringTypes and len(url)):
-		return (None, '')
-
-	i = url.find("://")
-	if i > -1:
-		url = url[i+3:]
-		
-	i = url.find(':')
-	if i > -1:
-		host = url[:i].strip()
-		tail = url[i+1:].strip()
-	else:
-		host = ''
-		tail = url
-	
-	for i in range(len(tail)):
-		if not tail[i].isdigit():
-			break
-	else:
-		i += 1
-	
-	portstr = tail[:i].strip()
-	tail = tail[i:].strip()
-	
-	found = len(tail)
-	for c in ('/', '+', '-', '*'):
-		i = tail.find(c)
-		if (i > -1) and (i < found):
-			found = i
-	
-	head = tail[:found].strip()
-	prefix = tail[found:].strip()
-	
-	prefix = prefix.strip('/')
-	if len(prefix) and prefix[0] not in ('+', '-', '*'):
-		prefix = '/' + prefix
-	
-	if len(head) and not len(host):
-		host = head
-
-	if len(host):
-		try:
-			host = socket.gethostbyname(host)
-		except socket.error:
-			pass
-
-	try:
-		port = int(portstr)
-	except ValueError:
-		port = None
-	
-	return ((host, port), prefix)
-
-######
-#
-# FilterString Utility functions
-#
-######
-
-def parseFilterStr(args):
-	"""Convert Message-Filter settings in '+<addr> -<addr> ...' format to a dict of the form
-	{ '<addr>':True, '<addr>':False, ... } 
-	Returns a list: ['<prefix>', filters]
-	"""
-	out = {}
-	
-	if type(args) in types.StringTypes:
-		args = [args]
-		
-	prefix = None
-	for arg in args:
-		head = None
-		for plus in arg.split('+'):
-			minus = plus.split('-')
-			plusfs = minus.pop(0).strip()
-			if len(plusfs):
-				plusfs = '/' + plusfs.strip('/')
-			
-			if (head == None) and (plusfs != "/*"):
-				head = plusfs
-			elif len(plusfs):
-				if plusfs == '/*':
-					out = { '/*':True }	# reset all previous filters
-				else:
-					out[plusfs] = True
-				
-			for minusfs in minus:
-				minusfs = minusfs.strip()
-				if len(minusfs):
-					minusfs = '/' + minusfs.strip('/')
-					if minusfs == '/*':
-						out = { '/*':False }	# reset all previous filters
-					else:
-						out[minusfs] = False
-				
-		if prefix == None:
-			prefix = head
-
-	return [prefix, out]
-
-def getFilterStr(filters):
-	"""Return the given 'filters' dict as a list of
-	'+<addr>' | '-<addr>' filter-strings
-	"""
-	if not len(filters):
-		return []
-	
-	if '/*' in filters.keys():
-		if filters['/*']:
-			out = ["+/*"]
-		else:
-			out = ["-/*"]
-	else:
-		if False in filters.values():
-			out = ["+/*"]
-		else:
-			out = ["-/*"]
-	
-	for (addr, bool) in filters.items():
-		if addr == '/*':
-			continue
-		
-		if bool:
-			out.append("+%s" % addr)
-		else:
-			out.append("-%s" % addr)
-
-	return out
-
 # A translation-table for mapping OSC-address expressions to Python 're' expressions
 OSCtrans = string.maketrans("{,}?","(|).")
 
@@ -779,16 +558,6 @@ class OSCRequestHandler(DatagramRequestHandler):
 	"""RequestHandler class for the OSCServer
 	"""
 	def dispatchMessage(self, pattern, tags, data):
-		"""Attmept to match the given OSC-address pattern, which may contain '*',
-		against all callbacks registered with the OSCServer.
-		Calls the matching callback and returns whatever it returns.
-		If no match is found, and a 'default' callback is registered, it calls that one,
-		or raises NoCallbackError if a 'default' callback is not registered.
-		
-		  - pattern (string):  The OSC-address of the receied message
-		  - tags (string):  The OSC-typetags of the receied message's arguments, without ','
-		  - data (list):  The message arguments
-		"""
 		self.server.callback(pattern, tags, data, self.client_address)
 		
 	def setup(self):
@@ -892,7 +661,7 @@ class OSCServer(UDPServer):
 		out += " v%s.%s-%s" % version
 		addr = self.address()
 		if addr:
-			out += " listening on osc://%s" % getUrlStr(addr)
+			out += " listening on osc://%s" % addr
 		else:
 			out += " (unbound)"
 			
@@ -920,16 +689,6 @@ class OSCServer(UDPServer):
 		except socket.error:
 			return None
 	
-	def reportErr(self, txt, client_address):
-		"""Writes 'OSCServer: txt' to sys.stderr
-		If self.error_prefix is defined, sends 'txt' as an OSC error-message to the client(s)
-		(see printErr() and sendOSCerror())
-		"""
-		self.printErr(txt)
-		
-		if len(self.error_prefix):
-			self.sendOSCerror(txt, client_address)
-	
 class ForkingOSCServer(ForkingMixIn, OSCServer):
 	"""An Asynchronous OSCServer.
 	This server forks a new process to handle each incoming request.
@@ -943,49 +702,3 @@ class ThreadingOSCServer(ThreadingMixIn, OSCServer):
 	""" 
 	# set the RequestHandlerClass, will be overridden by ForkingOSCServer & ThreadingOSCServer
 	RequestHandlerClass = ThreadingOSCRequestHandler
-
-######
-#
-# OSCError classes
-#
-######
-
-class OSCError(Exception):
-	"""Base Class for all OSC-related errors
-	"""
-	def __init__(self, message):
-		self.message = message
-
-	def __str__(self):
-		return self.message
-
-class OSCClientError(OSCError):
-	"""Class for all OSCClient errors
-	"""
-	pass
-
-class OSCServerError(OSCError):
-	"""Class for all OSCServer errors
-	"""
-	pass
-
-class NoCallbackError(OSCServerError):
-	"""This error is raised (by an OSCServer) when an OSCMessage with an 'unmatched' address-pattern
-	is received, and no 'default' handler is registered.
-	"""
-	def __init__(self, pattern):
-		"""The specified 'pattern' should be the OSC-address of the 'unmatched' message causing the error to be raised.
-		"""
-		self.message = "No callback registered to handle OSC-address '%s'" % pattern
-
-class NotSubscribedError(OSCClientError):
-	"""This error is raised (by an OSCMultiClient) when an attempt is made to unsubscribe a host
-	that isn't subscribed.
-	"""
-	def __init__(self, addr, prefix=None):
-		if prefix:
-			url = getUrlStr(addr, prefix)
-		else:
-			url = getUrlStr(addr, '')
-
-		self.message = "Target osc://%s is not subscribed" % url
