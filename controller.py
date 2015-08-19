@@ -1,6 +1,6 @@
 import mido
 
-from OSC import OSCServer
+from OSC import ThreadingOSCServer
 from animation.base import Animation
 
 class Parameter(object):
@@ -163,19 +163,15 @@ class OSCController(object):
     
     def __init__(self, client_address, port):
         print 'Connecting to OSC server at: %s:%s' % (client_address, port)
-        self.server = OSCServer((client_address, port))
-        self.server.timeout = 0
+        self.server = ThreadingOSCServer((client_address, port))
+        self.server.callback = self.dispatch
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
-        
-    def get(self, channel, param):
-        return self.controls[channel].get(param, None)
         
     def listen(self):
         # This is kind of hacky right now
         # But instead of registering a callback for each pattern,
         # we just override the noCallback handler and handle everything
         # with a single dispatch function.
-        self.server.noCallback_handler = self.dispatch
         self.server.handle_request()
         
     def dispatch(self, pattern, tags, data, addr):
@@ -184,6 +180,7 @@ class OSCController(object):
         # Although, many OSC clients can mimic MIDI.
         # This is because it allows me stay within my Ableton / midi sequencer workflow
         # For looping / quantization of animations to a common tempo.
+        
         expr = pattern.split('/')[1:]
         if len(expr) > 2:
             return
