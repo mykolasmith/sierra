@@ -166,7 +166,14 @@ class OSCController(object):
         self.server = ThreadingOSCServer((client_address, port))
         self.server.callback = self.dispatch
         self.controls = dict( (channel, {}) for channel in xrange(1,17) )
-        
+    
+    def get(self, channel, control):
+        result = None
+        if channel in self.controls:
+            if control in self.controls[channel]:
+                result = self.controls[channel][control]
+        return result
+    
     def listen(self):
         # This is kind of hacky right now
         # But instead of registering a callback for each pattern,
