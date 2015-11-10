@@ -1,7 +1,7 @@
 from Queue import Queue
 
 class AnimationConfig(object):
-    
+
     def __init__(self, length, controllers, msg, notes, params, trigger):
         self.length = length
         self.controllers = controllers
@@ -11,51 +11,51 @@ class AnimationConfig(object):
         self.trigger = trigger
 
 class Handler(object):
-    
+
     def __init__(self, strips, controllers):
         self.strips = strips
         self.controllers = controllers
-        
+
         # Note on MIDI messages waiting to be attached to an animaton
         self.on = Queue()
-        
+
         # Note off MIDI messages waiting to schedule expiry
         self.off = Queue()
-        
+
         # Messages for which we will remove the corresponding animation
         # from the active animations dictionary.
         self.expiry = Queue()
-        
+
         # A map of strip lengths to animation identifiers.
         # So that we are only doing work on a single animation,
         # regardless of if that animation appears on many strips.
         self.active = {}
-        
+
         # Expose the handler to the controllers
         for controller in controllers.itervalues():
             controller.handler = self
-        
+
     def worker(self, now):
         for group in self.active.itervalues():
             for anim in group.itervalues():
-                
+
                 if not anim.running:
                     anim.running = True
                     anim.t0 = now
-                    
+
                 anim.pixels[...] = 0
-    
+
                 if anim.done:
                     self.expiry.put(anim)
                 else:
                     anim.runner(now - anim.t0)
-        
+
     def note_on(self, now):
         while not self.on.empty():
             task = self.on.get()
             identifier = task['msg'].note
             current = self.active.get(identifier)
-            
+
             if current:
                 # If the MIDI message note refers to an animation that is already active,
                 # then we know that it is either a 'hold' or 'toggle'
@@ -71,7 +71,7 @@ class Handler(object):
                             break
                         else:
                             self.end_animation(identifier, anim, task['strips'])
-                 
+
             # This is where we schedule the animation depending on the unique
             # strip lengths for which we wish to trigger this animation
             # task['animation'] = Animation class (e.g. MotionTween)
@@ -87,20 +87,20 @@ class Handler(object):
                         break
                     else:
                         self.begin_animation(identifier, anim, length, task['strips'])
-                
+
                 elif anim.trigger == 'hold':
                     self.begin_animation(identifier, anim, length, task['strips'])
 
                 elif anim.trigger == 'oneshot':
                     identifier = id(anim)
                     self.begin_animation(identifier, anim, length, task['strips'])
-                
+
     def begin_animation(self, identifier, anim, length, strips):
         for strip in strips:
             if strip.length == anim.length:
                 strip.active.update({ identifier: anim })
         self.active.update({ identifier : {length : anim} })
-        
+
     def end_animation(self, identifier, anim, strips):
         for strip in strips:
             if strip.length == anim.length:
@@ -111,20 +111,20 @@ class Handler(object):
     def note_off(self, now):
         while not self.off.empty():
             msg = self.off.get()
-            current = self.active.get(msg.note) 
-            
+            current = self.active.get(msg.note)
+
             if current:
                 for anim in current.itervalues():
-                    
+
                     if anim.trigger == 'toggle':
                         break
-                
+
                     if anim.trigger == 'hold':
                         anim.t0 = now
                         anim.pixels_at_inflection = anim.pixels
                         anim.runner = anim.off
-                    
-                
+
+
     def expire(self):
         while not self.expiry.empty():
             expire = self.expiry.get()
@@ -132,5 +132,5 @@ class Handler(object):
                 identifier = expire.msg.note
             else:
                 identifier = id(expire)
-    
+
             self.end_animation(identifier, expire, self.strips)
