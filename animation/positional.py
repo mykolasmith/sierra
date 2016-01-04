@@ -6,7 +6,7 @@ class Positional(Animation):
 
     def __init__(self, config):
         super(Positional, self).__init__(config)
-
+        self.brightness = 1.0
         # Look at the range of notes assigned to this animations
         # In order to determine the min and max
         self.min = min(self.notes)
@@ -35,17 +35,18 @@ class Positional(Animation):
     def find_width(self, deltaMs):
         if self.oscillation != 0:
             oscillation = self.normalize(self.oscillation, 0, 10)
-            return 3 * round(self.width * abs(math.sin(deltaMs * oscillation)))
+            return 30 * round(self.width * abs(math.sin(deltaMs * oscillation)))
         return self.width
 
     def draw(self, width):
         try:
             rgb = self.hsb_to_rgb(self.hue, self.saturation, self.brightness)
-            self.pixels[self.midpoint] = rgb
+            self.pixels[self.midpoint] = rgb * 0.9 * self.master
             for px in reversed(xrange(1, int(round(width // 2)))):
                 factor = 1- (px / (width // 2))
-                self.pixels[self.midpoint+px] = rgb * factor
-                self.pixels[self.midpoint-px] = rgb * factor
+                self.pixels[self.midpoint+px] = rgb * factor * self.master
+                if self.midpoint-px >= 0:
+                    self.pixels[self.midpoint-px] = rgb * factor * self.master
         except IndexError:
             pass
 
