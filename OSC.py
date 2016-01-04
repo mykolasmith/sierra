@@ -24,7 +24,7 @@ IntTypes = [types.IntType]
 ######
 
 class OSCMessage(object):
-	
+
 	def __init__(self, address=""):
 		"""Instantiate a new OSCMessage.
 		The OSC-address can be specified with the 'address' argument
@@ -59,13 +59,13 @@ class OSCMessage(object):
 			argument = argument.items()
 		elif isinstance(argument, OSCMessage):
 			raise TypeError("Can only append 'OSCMessage' to 'OSCBundle'")
-		
+
 		if hasattr(argument, '__iter__'):
 			for arg in argument:
 				self.append(arg, typehint)
-			
+
 			return
-		
+
 		if typehint == 'b':
 			binary = OSCBlob(argument)
 			tag = 'b'
@@ -77,14 +77,14 @@ class OSCMessage(object):
 
 		self.typetags += tag
 		self.message += binary
-		
+
 	def getBinary(self):
 		"""Returns the binary representation of the message
 		"""
 		binary = OSCString(self.address)
 		binary += OSCString(self.typetags)
 		binary += self.message
-		
+
 		return binary
 
 	def __repr__(self):
@@ -96,25 +96,25 @@ class OSCMessage(object):
 		"""Returns the Message's address and contents as a string.
 		"""
 		return "%s %s" % (self.address, str(self.values()))
-	
+
 	def __len__(self):
 		"""Returns the number of arguments appended so far
 		"""
 		return (len(self.typetags) - 1)
-	
+
 	def __eq__(self, other):
 		"""Return True if two OSCMessages have the same address & content
 		"""
 		if not isinstance(other, self.__class__):
 			return False
-		
+
 		return (self.address == other.address) and (self.typetags == other.typetags) and (self.message == other.message)
-	
+
 	def __ne__(self, other):
 		"""Return (not self.__eq__(other))
 		"""
 		return not self.__eq__(other)
-	
+
 	def __add__(self, values):
 		"""Returns a copy of self, with the contents of 'values' appended
 		(see the 'extend()' method, below)
@@ -122,7 +122,7 @@ class OSCMessage(object):
 		msg = self.copy()
 		msg.extend(values)
 		return msg
-	
+
 	def __iadd__(self, values):
 		"""Appends the contents of 'values'
 		(equivalent to 'extend()', below)
@@ -130,38 +130,38 @@ class OSCMessage(object):
 		"""
 		self.extend(values)
 		return self
-	
+
 	def __radd__(self, values):
 		"""Appends the contents of this OSCMessage to 'values'
 		Returns the extended 'values' (list or tuple)
 		"""
 		out = list(values)
 		out.extend(self.values())
-		
+
 		if type(values) == types.TupleType:
 			return tuple(out)
-		
+
 		return out
-	
+
 	def _reencode(self, items):
 		"""Erase & rebuild the OSCMessage contents from the given
 		list of (typehint, value) tuples"""
 		self.clearData()
 		for item in items:
 			self.append(item[1], item[0])
-		
+
 	def values(self):
 		"""Returns a list of the arguments appended so far
 		"""
 		return decodeOSC(self.getBinary())[2:]
-	
+
 	def tags(self):
 		"""Returns a list of typetags of the appended arguments
 		"""
 		return list(self.typetags.lstrip(','))
-	
+
 	def items(self):
-		"""Returns a list of (typetag, value) tuples for 
+		"""Returns a list of (typetag, value) tuples for
 		the arguments appended so far
 		"""
 		out = []
@@ -169,7 +169,7 @@ class OSCMessage(object):
 		typetags = self.tags()
 		for i in range(len(values)):
 			out.append((typetags[i], values[i]))
-			
+
 		return out
 
 	def __contains__(self, val):
@@ -187,9 +187,9 @@ class OSCMessage(object):
 		"""
 		items = self.items()
 		del items[i]
-			
+
 		self._reencode(items)
-	
+
 	def _buildItemList(self, values, typehint=None):
 		if isinstance(values, OSCMessage):
 			items = values.items()
@@ -202,40 +202,40 @@ class OSCMessage(object):
 					items.append((typehint, val))
 		elif type(values) == types.TupleType:
 			items = [values[:2]]
-		else:		
+		else:
 			items = [(typehint, values)]
-			
+
 		return items
-	
+
 	def __setitem__(self, i, val):
 		"""Set indicatated argument (or slice) to a new value.
 		'val' can be a single int/float/string, or a (typehint, value) tuple.
 		Or, if 'i' is a slice, a list of these or another OSCMessage.
 		"""
 		items = self.items()
-		
+
 		new_items = self._buildItemList(val)
-		
+
 		if type(i) != types.SliceType:
 			if len(new_items) != 1:
 				raise TypeError("single-item assignment expects a single value or a (typetag, value) tuple")
-			
+
 			new_items = new_items[0]
-			
+
 		# finally...
 		items[i] = new_items
-		
+
 		self._reencode(items)
-	
+
 	def setItem(self, i, val, typehint=None):
 		"""Set indicated argument to a new value (with typehint)
 		"""
 		items = self.items()
-		
+
 		items[i] = (typehint, val)
-			
+
 		self._reencode(items)
-		
+
 	def copy(self):
 		"""Returns a deep copy of this OSCMessage
 		"""
@@ -243,69 +243,69 @@ class OSCMessage(object):
 		msg.typetags = self.typetags
 		msg.message = self.message
 		return msg
-	
+
 	def count(self, val):
 		"""Returns the number of times the given value occurs in the OSCMessage's arguments
 		"""
 		return self.values().count(val)
-	
+
 	def index(self, val):
 		"""Returns the index of the first occurence of the given value in the OSCMessage's arguments.
 		Raises ValueError if val isn't found
 		"""
 		return self.values().index(val)
-	
+
 	def extend(self, values):
 		"""Append the contents of 'values' to this OSCMessage.
 		'values' can be another OSCMessage, or a list/tuple of ints/floats/strings
 		"""
 		items = self.items() + self._buildItemList(values)
-		
+
 		self._reencode(items)
-		
+
 	def insert(self, i, val, typehint = None):
 		"""Insert given value (with optional typehint) into the OSCMessage
 		at the given index.
 		"""
 		items = self.items()
-		
+
 		for item in reversed(self._buildItemList(val)):
 			items.insert(i, item)
-			
+
 		self._reencode(items)
-		
+
 	def popitem(self, i):
 		"""Delete the indicated argument from the OSCMessage, and return it
 		as a (typetag, value) tuple.
 		"""
 		items = self.items()
-		
+
 		item = items.pop(i)
-		
+
 		self._reencode(items)
-		
+
 		return item
-	
+
 	def pop(self, i):
 		"""Delete the indicated argument from the OSCMessage, and return it.
 		"""
 		return self.popitem(i)[1]
-		
+
 	def reverse(self):
 		"""Reverses the arguments of the OSCMessage (in place)
 		"""
 		items = self.items()
-		
+
 		items.reverse()
-		
+
 		self._reencode(items)
-		
+
 	def remove(self, val):
 		"""Removes the first argument with the given value from the OSCMessage.
 		Raises ValueError if val isn't found.
 		"""
 		items = self.items()
-		
+
 		# this is not very efficient...
 		i = 0
 		for (t, v) in items:
@@ -316,11 +316,11 @@ class OSCMessage(object):
 			raise ValueError("'%s' not in OSCMessage" % str(m))
 		# but more efficient than first calling self.values().index(val),
 		# then calling self.items(), which would in turn call self.values() again...
-		
+
 		del items[i]
-		
+
 		self._reencode(items)
-		
+
 	def __iter__(self):
 		"""Returns an iterator of the OSCMessage's arguments
 		"""
@@ -356,17 +356,17 @@ class OSCMessage(object):
 def OSCString(next):
 	"""Convert a string into a zero-padded OSC String.
 	The length of the resulting string is always a multiple of 4 bytes.
-	The string ends with 1 to 4 zero-bytes ('\x00') 
+	The string ends with 1 to 4 zero-bytes ('\x00')
 	"""
-	
+
 	OSCstringLength = math.ceil((len(next)+1) / 4.0) * 4
 	return struct.pack(">%ds" % (OSCstringLength), str(next))
 
 def OSCBlob(next):
 	"""Convert a string into an OSC Blob.
 	An OSC-Blob is a binary encoded block of data, prepended by a 'size' (int32).
-	The size is always a mutiple of 4 bytes. 
-	The blob ends with 0 to 3 zero-bytes ('\x00') 
+	The size is always a mutiple of 4 bytes.
+	The blob ends with 0 to 3 zero-bytes ('\x00')
 	"""
 
 	if type(next) in types.StringTypes:
@@ -441,7 +441,7 @@ def _readString(data):
 def _readBlob(data):
 	"""Reads the next (numbered) block of data
 	"""
-	
+
 	length   = struct.unpack(">i", data[0:4])[0]
 	nextData = int(math.ceil((length) / 4.0) * 4) + 4
 	return (data[4:length+4], data[nextData:])
@@ -449,7 +449,7 @@ def _readBlob(data):
 def _readInt(data):
 	"""Tries to interpret the next 4 bytes of the data
 	as a 32-bit integer. """
-	
+
 	if(len(data)<4):
 		print "Error: too few bytes for int", data, len(data)
 		rest = data
@@ -484,9 +484,9 @@ def _readTimeTag(data):
 
 def _readFloat(data):
 	"""Tries to interpret the next 4 bytes of the data
-	as a 32-bit float. 
+	as a 32-bit float.
 	"""
-	
+
 	if(len(data)<4):
 		print "Error: too few bytes for float", data, len(data)
 		rest = data
@@ -498,7 +498,7 @@ def _readFloat(data):
 	return (float, rest)
 
 def decodeOSC(data):
-	"""Converts a binary OSC message to a Python list. 
+	"""Converts a binary OSC message to a Python list.
 	"""
 	table = {"i":_readInt, "f":_readFloat, "s":_readString, "b":_readBlob}
 	decoded = []
@@ -544,7 +544,7 @@ def getRegEx(pattern):
 	pattern = pattern.replace(")", r"\)")		# escape all ')'s.
 	pattern = pattern.replace("*", r".*")		# replace a '*' by '.*' (match 0 or more characters)
 	pattern = pattern.translate(OSCtrans)		# change '?' to '.' and '{,}' to '(|)'
-	
+
 	return re.compile(pattern)
 
 
@@ -559,7 +559,7 @@ class OSCRequestHandler(DatagramRequestHandler):
 	"""
 	def dispatchMessage(self, pattern, tags, data):
 		self.server.callback(pattern, tags, data, self.client_address)
-		
+
 	def setup(self):
 		"""Prepare RequestHandler.
 		Unpacks request as (packet, source socket address)
@@ -571,16 +571,16 @@ class OSCRequestHandler(DatagramRequestHandler):
 		"""Recursive bundle-unpacking function"""
 		if decoded[0] != "#bundle":
 			self.dispatchMessage(decoded[0], decoded[1][1:], decoded[2:])
-		
+
 	def handle(self):
 		"""Handle incoming OSCMessage
 		"""
 		decoded = decodeOSC(self.packet)
 		if not len(decoded):
 			return
-		
+
 		self._unbundle(decoded)
-		
+
 	def finish(self):
 		"""Finish handling OSCMessage.
 		Send any reply returned by the callback(s) back to the originating client
@@ -597,11 +597,11 @@ class ThreadingOSCRequestHandler(OSCRequestHandler):
 		This version starts a new thread for each sub-Bundle found in the Bundle,
 		then waits for all its children to finish.
 		"""
-		
+
 		if decoded[0] != "#bundle":
 			self.dispatchMessage(decoded[0], decoded[1][1:], decoded[2:])
 			return
-		
+
 ######
 #
 # OSCServer classes
@@ -614,18 +614,18 @@ class OSCServer(UDPServer):
 	The OSC address-pattern is matched against a set of OSC-adresses
 	that have been registered to the server with a callback-function.
 	If the adress-pattern of the message machtes the registered address of a callback,
-	that function is called. 
+	that function is called.
 	"""
-	
+
 	# set the RequestHandlerClass, will be overridden by ForkingOSCServer & ThreadingOSCServer
 	RequestHandlerClass = OSCRequestHandler
-	
+
 	# define a socket timeout, so the serve_forever loop can actually exit.
 	socket_timeout = 0.
-	
+
 	# DEBUG: print error-tracebacks (to stderr)?
 	print_tracebacks = False
-	
+
 	def __init__(self, server_address, client=None, return_port=0):
 		"""Instantiate an OSCServer.
 		  - server_address ((host, port) tuple): the local host & UDP-port
@@ -636,7 +636,7 @@ class OSCServer(UDPServer):
 		  for replies coming from this server.
 		"""
 		UDPServer.__init__(self, server_address, self.RequestHandlerClass)
-		
+
 		self.callback = None
 		self.socket.settimeout(self.socket_timeout)
 		self.running = False
@@ -653,7 +653,7 @@ class OSCServer(UDPServer):
 		self.running = False
 		self.client.close()
 		self.server_close()
-	
+
 	def __str__(self):
 		"""Returns a string containing this Server's Class-name, software-version and local bound address (if any)
 		"""
@@ -664,15 +664,15 @@ class OSCServer(UDPServer):
 			out += " listening on osc://%s" % addr
 		else:
 			out += " (unbound)"
-			
+
 		return out
-	
+
 	def __eq__(self, other):
 		"""Compare function.
 		"""
 		if not isinstance(other, self.__class__):
 			return False
-			
+
 		return cmp(self.socket._sock, other.socket._sock)
 
 	def __ne__(self, other):
@@ -688,17 +688,17 @@ class OSCServer(UDPServer):
 			return self.socket.getsockname()
 		except socket.error:
 			return None
-	
+
 class ForkingOSCServer(ForkingMixIn, OSCServer):
 	"""An Asynchronous OSCServer.
 	This server forks a new process to handle each incoming request.
-	""" 
+	"""
 	# set the RequestHandlerClass, will be overridden by ForkingOSCServer & ThreadingOSCServer
 	RequestHandlerClass = ThreadingOSCRequestHandler
 
 class ThreadingOSCServer(ThreadingMixIn, OSCServer):
 	"""An Asynchronous OSCServer.
 	This server starts a new thread to handle each incoming request.
-	""" 
+	"""
 	# set the RequestHandlerClass, will be overridden by ForkingOSCServer & ThreadingOSCServer
 	RequestHandlerClass = ThreadingOSCRequestHandler
