@@ -11,5 +11,5 @@ def callback(path, tags, args, source):
     print path, tags, args, source
 
 while True:
-    server.noCallback_handler = callback
+    server.callback = callback
     server.handle_request()
